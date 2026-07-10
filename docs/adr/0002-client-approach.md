@@ -2,8 +2,8 @@
 id: "0002"
 title: "Client approach — CLI primary, webhook ingress"
 date: 2026-07-10
-status: proposed
-deciders: ["claude (advisor)"]
+status: accepted
+deciders: ["claude (advisor)", "0x0abc123"]
 retrospective: false
 decision_key: client_approach
 supersedes: null

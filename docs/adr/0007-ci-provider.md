@@ -2,8 +2,8 @@
 id: "0007"
 title: "CI provider — GitHub Actions"
 date: 2026-07-10
-status: proposed
-deciders: ["claude (advisor)"]
+status: accepted
+deciders: ["claude (advisor)", "0x0abc123"]
 retrospective: false
 decision_key: ci_provider
 supersedes: null

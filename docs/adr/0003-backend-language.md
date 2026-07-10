@@ -2,8 +2,8 @@
 id: "0003"
 title: "Backend language — Go"
 date: 2026-07-10
-status: proposed
-deciders: ["claude (advisor)"]
+status: accepted
+deciders: ["claude (advisor)", "0x0abc123"]
 retrospective: false
 decision_key: backend_language
 supersedes: null

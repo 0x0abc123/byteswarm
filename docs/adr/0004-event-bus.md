@@ -2,8 +2,8 @@
 id: "0004"
 title: "Event bus — NATS JetStream behind a Bus port"
 date: 2026-07-10
-status: proposed
-deciders: ["claude (advisor)"]
+status: accepted
+deciders: ["claude (advisor)", "0x0abc123"]
 retrospective: false
 decision_key: event_bus
 supersedes: null

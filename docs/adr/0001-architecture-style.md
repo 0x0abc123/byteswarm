@@ -2,8 +2,8 @@
 id: "0001"
 title: "Architecture style — modular monolith"
 date: 2026-07-10
-status: proposed
-deciders: ["claude (advisor)"]
+status: accepted
+deciders: ["claude (advisor)", "0x0abc123"]
 retrospective: false
 decision_key: architecture_style
 supersedes: null

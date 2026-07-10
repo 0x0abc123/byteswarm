@@ -29,10 +29,10 @@ project:
 # ---------------------------------------------------------------------------
 stages:
   architecture:               # skill: architecture-advisor
-    status: in_progress
-    approved: false
-    approved_by: null
-    approved_at: null
+    status: complete
+    approved: true
+    approved_by: 0x0abc123
+    approved_at: 2026-07-10T07:19:05Z
     artifacts: docs/adr/
 
   c4design:                  # skill: c4-designer
@@ -55,14 +55,21 @@ stages:
 # skills (e.g. generate-cicd reads ci_provider); rationale lives in the ADR.
 # ---------------------------------------------------------------------------
 active:
-  architecture_style: null    # e.g. modular-monolith | microservices  -> see adr_refs
-  backend_language: null      # go | python | mixed
-  clients: []                 # e.g. [svelte-spa, cli]
-  data_stores: []             # e.g. [postgresql]
-  ci_provider: null           # github | gitlab | jenkins
-  deploy_targets: []          # e.g. [container, serverless]
+  architecture_style: modular-monolith   # -> see adr_refs
+  backend_language: go        # go | python | mixed
+  clients: [cli, webhook]     # CLI primary; webhook ingress
+  data_stores: [postgresql, sqlite]      # behind a Repository port
+  event_bus: nats-jetstream   # behind a Bus port (see adr 0004)
+  ci_provider: github         # github | gitlab | jenkins
+  deploy_targets: [vm, container, kubernetes]   # serverless excluded
   adr_refs:                   # decision key -> ADR id (filename prefix)
-    {}                        # e.g. backend_language: "0003"
+    architecture_style: "0001"
+    client_approach: "0002"
+    backend_language: "0003"
+    event_bus: "0004"
+    data_stores: "0005"
+    deploy_targets: "0006"
+    ci_provider: "0007"
 
 # ---------------------------------------------------------------------------
 # Refactors IN FLIGHT only. When a refactor completes, its entry is REMOVED
