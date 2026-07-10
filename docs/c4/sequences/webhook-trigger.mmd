@@ -1,0 +1,18 @@
+%% C4 dynamic — Webhook-triggered event (auth / fail-closed path)
+%% Source of truth: docs/adr/ + docs/architecture-brief.md — regenerate via /c4-designer, do not hand-edit
+%% Generated: 2026-07-10
+sequenceDiagram
+    autonumber
+    participant TRG as External trigger source
+    participant SRV as byteswarm Server
+    participant BUS as Event Bus
+
+    TRG->>SRV: POST webhook — event + shared secret [webhook/HTTPS]
+    SRV->>SRV: validate shared secret (auth port, deny by default)
+    alt secret invalid or missing
+        SRV-->>TRG: 401 Unauthorized — fail closed, logged [HTTPS]
+    else secret valid
+        SRV->>BUS: publish event on bw.evt.type.workflowID [NATS]
+        BUS-->>SRV: ack — persisted to durable stream [NATS]
+        SRV-->>TRG: 202 Accepted [HTTPS]
+    end

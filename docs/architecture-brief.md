@@ -43,6 +43,9 @@ emit further events — composing larger workflows from small, independent steps
 - Delivery: at-least-once; out-of-order tolerated; consumers idempotent.
 - Replay/audit of past events is required.
 - Scale: peak ~thousands events/s; dozens–100+ consumers; ≤10 concurrent workflows.
+- Subscription scope: each instance subscribes to a single `workflowID` or to any; scope
+  is a per-instance config parameter and filtering is broker-side, not per-consumer.
+  Scale by one any-scope instance or by N disjoint per-`workflowID` instances (not both).
 - Resilience: survive server reboot and external-network loss/reconnect; no critical
   in-process state.
 - Security: single trusted operator; publish/consume unauthenticated; webhook auth is

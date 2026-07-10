@@ -1,0 +1,15 @@
+event: c4design-approved
+timestamp: 2026-07-10T08:49:17Z
+actor: 0x0abc123
+stage: c4design
+summary: C4 design approved — L1 context, L2 container (modular monolith), and four key sequences.
+refs:
+  adr: ["0001", "0002", "0003", "0004", "0005"]
+  commit: f4f3a18          # the chore(state) commit recording approval
+  files:
+    - docs/c4/l1-context.mmd
+    - docs/c4/l2-container.mmd
+    - docs/c4/sequences/webhook-trigger.mmd
+    - docs/c4/sequences/consumer-chain.mmd
+    - docs/c4/sequences/replay-audit.mmd
+    - docs/c4/sequences/reconnect-recovery.mmd

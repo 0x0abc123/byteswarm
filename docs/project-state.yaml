@@ -36,10 +36,10 @@ stages:
     artifacts: docs/adr/
 
   c4design:                  # skill: c4-designer
-    status: not_started
-    approved: false
-    approved_by: null
-    approved_at: null
+    status: complete
+    approved: true
+    approved_by: 0x0abc123
+    approved_at: 2026-07-10T08:49:17Z
     artifacts: docs/c4/
 
   bootstrap:                  # skill: bootstrap-structure

@@ -1,0 +1,39 @@
+%% C4 L2 — Container diagram for byteswarm
+%% Source of truth: docs/adr/ — regenerate via /c4-designer, do not hand-edit
+%% Generated: 2026-07-10
+flowchart TB
+    operator(["Operator<br/><i>engineer</i>"])
+    trigger["External trigger source<br/><i>[external system]</i>"]
+
+    subgraph sys [byteswarm]
+        cli["CLI<br/><i>[container: Go static binary]</i>"]
+        srv["byteswarm Server<br/><i>[container: Go net/http + in-process consumers]</i>"]
+        bus["Event Bus<br/><i>[container: NATS JetStream]</i>"]
+        db[("State Store<br/><i>[db: PostgreSQL default / SQLite embedded]</i>")]
+    end
+
+    tools["External tools & processes<br/><i>[external system]</i>"]
+    netsvc["External network services<br/><i>[external system]</i>"]
+    sinks["Business-event sinks<br/><i>[external system]</i>"]
+    logsink["Logging / monitoring sink<br/><i>[external system]</i>"]
+
+    operator -->|"runs [shell]"| cli
+    cli -->|"submits events & commands [JSON/HTTPS]"| srv
+    trigger -->|"fires events (shared-secret auth) [webhook/HTTPS]"| srv
+    srv -->|"publishes events [NATS]"| bus
+    bus -->|"delivers & redelivers events, at-least-once [NATS]"| srv
+    srv -->|"reads/writes consumer & workflow state [SQL]"| db
+    srv -->|"runs commands / launches processes [OS exec]"| tools
+    srv -->|"reads from / sends data to [network]"| netsvc
+    srv -->|"emits business events [consumer-defined]"| sinks
+    srv -->|"ships errors/exceptions [structured logs]"| logsink
+
+    classDef person    fill:#08427b,stroke:#052e56,color:#ffffff
+    classDef internal  fill:#1168bd,stroke:#0b4884,color:#ffffff
+    classDef external  fill:#999999,stroke:#6b6b6b,color:#ffffff
+    classDef datastore fill:#438dd5,stroke:#2e6295,color:#ffffff
+    classDef component fill:#85bbf0,stroke:#5d82a8,color:#000000
+    class operator person
+    class cli,srv,bus internal
+    class db datastore
+    class trigger,tools,netsvc,sinks,logsink external

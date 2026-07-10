@@ -1,0 +1,15 @@
+event: c4design-completed
+timestamp: 2026-07-10T08:49:17Z
+actor: claude
+stage: c4design
+summary: L1/L2 diagrams and four key sequences written; brief clarified re per-instance workflowID scope. Awaiting sign-off.
+refs:
+  adr: ["0001", "0002", "0003", "0004", "0005"]
+  commit: null
+  files:
+    - docs/c4/l1-context.mmd
+    - docs/c4/l2-container.mmd
+    - docs/c4/sequences/webhook-trigger.mmd
+    - docs/c4/sequences/consumer-chain.mmd
+    - docs/c4/sequences/replay-audit.mmd
+    - docs/c4/sequences/reconnect-recovery.mmd
