@@ -43,7 +43,7 @@ stages:
     artifacts: docs/c4/
 
   bootstrap:                  # skill: bootstrap-structure
-    status: not_started
+    status: in_progress
     approved: false
     approved_by: null
     approved_at: null
