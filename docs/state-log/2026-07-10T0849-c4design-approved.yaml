@@ -5,7 +5,7 @@ stage: c4design
 summary: C4 design approved — L1 context, L2 container (modular monolith), and four key sequences.
 refs:
   adr: ["0001", "0002", "0003", "0004", "0005"]
-  commit: null
+  commit: f4f3a18          # the chore(state) commit recording approval
   files:
     - docs/c4/l1-context.mmd
     - docs/c4/l2-container.mmd
