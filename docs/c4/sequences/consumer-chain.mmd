@@ -21,4 +21,4 @@ sequenceDiagram
     end
     SRV->>BUS: publish derived event for downstream consumers [NATS]
     SRV->>BUS: ack processed event [NATS]
-    Note over SRV,BUS: at-least-once — ack only after work + derived event persist; crash before ack causes redelivery (consumers idempotent)
+    Note over SRV,BUS: at-least-once — ack only after work + derived event persist, crash before ack causes redelivery (consumers idempotent)
