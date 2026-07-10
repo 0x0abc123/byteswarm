@@ -1,0 +1,77 @@
+# =============================================================================
+# project-state.yaml — PIPELINE SNAPSHOT (current state only)
+# =============================================================================
+# CONTRACT
+#   * This file is OVERWRITTEN in place. It is never appended to. It must stay
+#     small (~40 lines) for the life of the project.
+#   * Skills read this file as a PRECONDITION check before running, and write
+#     their completion status here.
+#   * Every state change is committed SEPARATELY from other work, with the
+#     approver's name in the commit message for sign-off events:
+#       chore(state): approve architecture stage [approved-by: Jane Doe]
+#   * History and traceability live in docs/state-log/ — one small file per
+#     event, append-only. Nothing in the pipeline ever reads state-log/
+#     wholesale; it exists for humans and audits.
+#   * Decision DETAIL never lives here. This file holds pointers (ADR ids);
+#     the "why" lives in docs/adr/.
+# =============================================================================
+
+schema_version: 1
+
+project:
+  name: null                  # set by architecture-advisor
+  initialized: null           # ISO-8601, set on first architecture-advisor run
+
+# ---------------------------------------------------------------------------
+# Pipeline stages. Allowed status values: not_started | in_progress | complete
+# A stage is UNLOCKED when the previous stage has status: complete AND
+# approved: true. Skills must refuse to run if their stage is locked.
+# ---------------------------------------------------------------------------
+stages:
+  architecture:               # skill: architecture-advisor
+    status: not_started
+    approved: false
+    approved_by: null
+    approved_at: null
+    artifacts: docs/adr/
+
+  c4design:                  # skill: c4-designer
+    status: not_started
+    approved: false
+    approved_by: null
+    approved_at: null
+    artifacts: docs/c4/
+
+  bootstrap:                  # skill: bootstrap-structure
+    status: not_started
+    approved: false
+    approved_by: null
+    approved_at: null
+    ci_green: false           # exit criterion: build + empty test suite + CI pass
+    artifacts: "."
+
+# ---------------------------------------------------------------------------
+# Active decisions — POINTERS ONLY. Values here are quick-reference keys for
+# skills (e.g. generate-cicd reads ci_provider); rationale lives in the ADR.
+# ---------------------------------------------------------------------------
+active:
+  architecture_style: null    # e.g. modular-monolith | microservices  -> see adr_refs
+  backend_language: null      # go | python | mixed
+  clients: []                 # e.g. [svelte-spa, cli]
+  data_stores: []             # e.g. [postgresql]
+  ci_provider: null           # github | gitlab | jenkins
+  deploy_targets: []          # e.g. [container, serverless]
+  adr_refs:                   # decision key -> ADR id (filename prefix)
+    {}                        # e.g. backend_language: "0003"
+
+# ---------------------------------------------------------------------------
+# Refactors IN FLIGHT only. When a refactor completes, its entry is REMOVED
+# from this list and a completion event is written to docs/state-log/.
+# ---------------------------------------------------------------------------
+refactors: []
+  # - id: refactor-0001
+  #   summary: "split reporting into its own service"
+  #   status: impact_analysis | approved | in_progress
+  #   approved_by: null
+  #   affected_stages: [c4design, bootstrap]
+  #   adr_refs: ["0009"]
