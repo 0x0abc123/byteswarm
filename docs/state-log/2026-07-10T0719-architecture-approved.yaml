@@ -1,0 +1,16 @@
+event: architecture-approved
+timestamp: 2026-07-10T07:19:05Z
+actor: 0x0abc123
+stage: architecture
+summary: Architecture approved — modular monolith, Go, CLI+webhook, NATS JetStream bus, PostgreSQL/SQLite, GitHub Actions.
+refs:
+  adr: ["0001", "0002", "0003", "0004", "0005", "0006", "0007"]
+  commit: 57f0aec          # the chore(state) commit recording approval
+  files:
+    - docs/adr/0001-architecture-style.md
+    - docs/adr/0002-client-approach.md
+    - docs/adr/0003-backend-language.md
+    - docs/adr/0004-event-bus.md
+    - docs/adr/0005-data-stores.md
+    - docs/adr/0006-deployment-and-supporting-stack.md
+    - docs/adr/0007-ci-provider.md

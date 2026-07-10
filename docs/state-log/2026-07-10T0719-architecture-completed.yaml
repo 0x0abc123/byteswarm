@@ -1,0 +1,17 @@
+event: architecture-completed
+timestamp: 2026-07-10T07:19:05Z
+actor: claude
+stage: architecture
+summary: ADRs (0001-0007) and architecture brief written; awaiting human sign-off.
+refs:
+  adr: ["0001", "0002", "0003", "0004", "0005", "0006", "0007"]
+  commit: null
+  files:
+    - docs/adr/0001-architecture-style.md
+    - docs/adr/0002-client-approach.md
+    - docs/adr/0003-backend-language.md
+    - docs/adr/0004-event-bus.md
+    - docs/adr/0005-data-stores.md
+    - docs/adr/0006-deployment-and-supporting-stack.md
+    - docs/adr/0007-ci-provider.md
+    - docs/architecture-brief.md
