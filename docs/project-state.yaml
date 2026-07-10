@@ -36,7 +36,7 @@ stages:
     artifacts: docs/adr/
 
   c4design:                  # skill: c4-designer
-    status: not_started
+    status: in_progress
     approved: false
     approved_by: null
     approved_at: null

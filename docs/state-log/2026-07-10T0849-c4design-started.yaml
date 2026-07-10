@@ -1,0 +1,9 @@
+event: c4design-started
+timestamp: 2026-07-10T08:49:17Z
+actor: claude
+stage: c4design
+summary: c4-designer stage begun; deriving L1/L2 diagrams and key sequences from ADRs and brief.
+refs:
+  adr: []
+  commit: null
+  files: []
