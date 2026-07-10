@@ -1,0 +1,21 @@
+%% C4 dynamic — Reconnect & recovery after reboot / network loss
+%% Source of truth: docs/adr/ + docs/architecture-brief.md — regenerate via /c4-designer, do not hand-edit
+%% Generated: 2026-07-10
+sequenceDiagram
+    autonumber
+    participant SRV as byteswarm Server
+    participant BUS as Event Bus
+    participant DB as State Store
+
+    Note over SRV,BUS: connection lost — server reboot or network partition
+    loop until reconnected (exponential backoff)
+        SRV->>BUS: reconnect attempt [NATS]
+    end
+    BUS-->>SRV: reconnected — resume durable consumer at last cursor [NATS]
+    BUS->>SRV: redeliver unacknowledged events [NATS]
+    opt stateful consumer
+        SRV->>DB: reload state (durable source of truth) [SQL]
+        DB-->>SRV: state
+    end
+    SRV->>SRV: reprocess idempotently
+    SRV->>BUS: ack [NATS]

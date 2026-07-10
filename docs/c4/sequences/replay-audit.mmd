@@ -1,0 +1,19 @@
+%% C4 dynamic — Replay / audit of past events for a workflow
+%% Source of truth: docs/adr/ + docs/architecture-brief.md — regenerate via /c4-designer, do not hand-edit
+%% Generated: 2026-07-10
+sequenceDiagram
+    autonumber
+    participant OP as Operator
+    participant CLI as CLI
+    participant SRV as byteswarm Server
+    participant BUS as Event Bus
+
+    OP->>CLI: replay workflow workflowID [shell]
+    CLI->>SRV: request replay(workflowID, from = seq/time) [JSON/HTTPS]
+    SRV->>BUS: open replay consumer from sequence/time on stream [NATS]
+    loop each retained event for workflowID
+        BUS-->>SRV: deliver past event [NATS]
+        SRV->>SRV: re-dispatch to consumers (idempotent)
+    end
+    SRV-->>CLI: replay complete (event count) [JSON/HTTPS]
+    CLI-->>OP: summary [shell]
