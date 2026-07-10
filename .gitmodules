@@ -1,5 +1,5 @@
 [submodule ".claude/skills"]
 	path = .claude/skills
-	url = https://github.com/0x0abc123/claudecode-dev-harness-skills.git
+	url = git@github.com:0x0abc123/claudecode-dev-harness-skills.git
 	# ^ replace with the real skills-repo URL, then:
 	#   git submodule update --init && git -C .claude/skills checkout v0.1.0
