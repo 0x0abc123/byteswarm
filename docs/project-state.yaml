@@ -19,8 +19,8 @@
 schema_version: 1
 
 project:
-  name: null                  # set by architecture-advisor
-  initialized: null           # ISO-8601, set on first architecture-advisor run
+  name: byteswarm             # set by architecture-advisor
+  initialized: 2026-07-10T07:19:05Z  # ISO-8601, set on first architecture-advisor run
 
 # ---------------------------------------------------------------------------
 # Pipeline stages. Allowed status values: not_started | in_progress | complete
@@ -29,7 +29,7 @@ project:
 # ---------------------------------------------------------------------------
 stages:
   architecture:               # skill: architecture-advisor
-    status: not_started
+    status: in_progress
     approved: false
     approved_by: null
     approved_at: null

@@ -1,0 +1,9 @@
+event: architecture-started
+timestamp: 2026-07-10T07:19:05Z
+actor: claude
+stage: architecture
+summary: Architecture-advisor stage begun; requirements interview starting.
+refs:
+  adr: []
+  commit: null
+  files: []
