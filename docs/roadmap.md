@@ -139,7 +139,7 @@ the code actually lives (`bus`/`consumer`) — see the drift note up top.
 Risk-forward: F4.1 (making processing failures actually redeliver) is the core
 correctness gap and leads; F4.4 may expose a subject-scheme constraint (below).
 
-- [ ] **F4.1 At-least-once processing (redeliver on consumer failure)** · internal/consumer · size M · depends on: — (F1.2 done)
+- [x] **F4.1 At-least-once processing (redeliver on consumer failure)** · internal/consumer · size M · depends on: — (F1.2 done)
   > /implement-feature make the registry redeliver events whose processing failed.
   > - Component: internal/consumer (the `Registry.Run` delivery handler; the bus already Naks when the handler returns an error).
   > - Behavior: `dispatch` currently swallows consumer errors and `Run`'s handler always returns nil (always acks). Change dispatch to report whether any subscribed consumer failed, and have `Run`'s handler **return an error when processing failed** so the bus `Nak`s → JetStream redelivers. Consumers must be idempotent (already a stated non-functional in the brief) since a redelivered event re-runs the type's consumers. Keep panic isolation. Add a bounded redelivery guard so a permanently-failing event doesn't loop forever (JetStream `MaxDeliver` + a logged drop, or defer a dead-letter to its own chunk — decide in the PR, keep it small).
