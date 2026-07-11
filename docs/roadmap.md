@@ -80,7 +80,7 @@ into the composition root so script plugins become live consumers. Risk-forward:
 F2.1's pure-Go SQLite driver choice (to preserve `CGO_ENABLED=0`) is the most
 uncertain piece, so it leads.
 
-- [ ] **F2.1 SQLite Repository adapter** · internal/store · size M · depends on: —
+- [x] **F2.1 SQLite Repository adapter** · internal/store · size M · depends on: —
   > /implement-feature SQLite adapter for the consumer.Repository port.
   > - Component: internal/store (new module; outbound adapter implementing consumer.Repository — `Load(ctx, id) ([]byte, error)`, `Save(ctx, id, state []byte) error`).
   > - Behavior: on `database/sql` (ADR-0005) with a **pure-Go SQLite driver (`modernc.org/sqlite`) to keep the `CGO_ENABLED=0` static build** (ADR-0006). `New(path)` opens the DB and ensures a `consumer_state(id TEXT PRIMARY KEY, state BLOB, updated_at)` table; `Load`/`Save` use **parameterised queries only** (security-fundamentals). A missing key returns `(nil, nil)` — "no state yet". Include a reusable Repository **contract test** helper (exercises any consumer.Repository) so F2.2 can reuse it.
