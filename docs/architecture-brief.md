@@ -11,13 +11,17 @@ emit further events — composing larger workflows from small, independent steps
 
 - Operator — an engineer who runs and administers the framework and triggers work — via CLI.
 - External trigger source — an upstream system or automation that fires events — via webhook.
-- Consumer author — a developer who extends the framework with new event consumers (build time).
+- Consumer author — a developer who extends the framework with compiled-in Go event consumers (build time).
+- Plugin author — a trusted operator/developer who adds runtime JavaScript plugin consumers via config, no rebuild (ADR-0008).
 
 ## External systems
 
 - Event bus — internal backbone — durable publish/subscribe with replay.
 - State repository — outbound — durable per-consumer and workflow state.
-- External tools & processes — outbound — shell commands and long-running processes consumers launch.
+- External tools & processes — outbound — shell commands and long-running processes consumers launch
+  (for script plugins, via a host-controlled `exec` allowlist).
+- Plugin scripts & sandbox — a config-declared plugins directory holds script source; each plugin has a
+  sandboxed working directory the host confines file access to (ADR-0008).
 - External network services — outbound — services consumers read from / send data to.
 - Business-event sinks — outbound — external destinations for emitted business telemetry.
 - Logging / monitoring sink — outbound — structured error and exception records.
@@ -28,6 +32,8 @@ emit further events — composing larger workflows from small, independent steps
 - Define and run automation workflows as chains of events.
 - Publish/subscribe by event type, plus a global broadcast event type for systemwide notices.
 - Extensible in-process consumer model; a consumer subscribes to one or a subset of event types.
+- Two consumer kinds behind one port: compiled-in Go consumers, and runtime-loaded JavaScript (goja)
+  script plugins declared in config, sandboxed with a host capability API (ADR-0008).
 - Consumers run synchronous shell commands, launch long-running processes, read/write durable
   repositories, and call external services.
 - Consumers emit derived events destined for downstream consumers.
@@ -49,7 +55,10 @@ emit further events — composing larger workflows from small, independent steps
 - Resilience: survive server reboot and external-network loss/reconnect; no critical
   in-process state.
 - Security: single trusted operator; publish/consume unauthenticated; webhook auth is
-  shared-secret now and pluggable for stronger mechanisms later; auth fails closed.
+  shared-secret now and pluggable for stronger mechanisms later; auth fails closed. Script plugins
+  (ADR-0008) run in a defense-in-depth sandbox: host-mediated capabilities only, exec allowlist
+  (argv, no shell), namespaced state, confined filesystem, per-invocation resource bounds; capability
+  denials are logged without leaking payloads.
 - Deployment: on-prem, cloud, and containers; serverless out of scope; single
   self-contained artifact preferred; configured via a config file with environment overrides.
 - Longevity: long-lived product; minimal dependencies.
@@ -69,6 +78,8 @@ emit further events — composing larger workflows from small, independent steps
 - CLI-triggered workflow — operator publishes an initiating event; subscribed consumers react.
 - Webhook-triggered event — external caller fires an authenticated webhook; an event is injected.
 - Consumer chain — a consumer handles an event, does its work, and emits derived event(s) downstream.
+- Plugin invocation — a script plugin subscribed to an event type is invoked with the event payload; it
+  uses the host capability API (exec/store/fs/publish) within its sandbox and resource bounds (ADR-0008).
 - Global broadcast — a systemwide notification is delivered to all subscribed consumers.
 - Replay / audit — past events for a `workflowID` are re-read from the durable log.
 - Reconnect & recovery — after reboot or network loss, an instance reconnects, resumes from durable
