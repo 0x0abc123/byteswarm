@@ -3,6 +3,7 @@ package bus
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"sync/atomic"
@@ -219,5 +220,126 @@ func awaitSignal(t *testing.T, ch chan struct{}, what string) {
 	case <-ch:
 	case <-time.After(8 * time.Second):
 		t.Fatalf("timed out waiting for %s", what)
+	}
+}
+
+func collectReplay(t *testing.T, b *JetStreamBus, subject string, since time.Time) []event.Event {
+	t.Helper()
+	var got []event.Event
+	err := b.Replay(context.Background(), subject, since, func(_ context.Context, e event.Event) error {
+		got = append(got, e)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Replay: %v", err)
+	}
+	return got
+}
+
+func TestReplayReadsAllFromStart(t *testing.T) {
+	b, err := New(Config{URL: startJetStreamServer(t), Stream: "BYTESWARM_REPLAY"}, testLogger())
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	t.Cleanup(func() { _ = b.Close() })
+
+	types := []string{"alpha", "beta", "gamma"}
+	for i, ty := range types {
+		if err := b.Publish(context.Background(), event.Event{
+			Type: ty, WorkflowID: "wf1", Payload: []byte(fmt.Sprintf(`{"i":%d}`, i)),
+		}); err != nil {
+			t.Fatalf("publish %s: %v", ty, err)
+		}
+	}
+
+	got := collectReplay(t, b, event.SubjectAll, time.Time{})
+	if len(got) != len(types) {
+		t.Fatalf("replayed %d events, want %d", len(got), len(types))
+	}
+	for i, ty := range types {
+		if got[i].Type != ty {
+			t.Fatalf("order: got[%d].Type = %q, want %q", i, got[i].Type, ty)
+		}
+	}
+	if string(got[0].Payload) != `{"i":0}` {
+		t.Fatalf("got[0].Payload = %s, want %s", got[0].Payload, `{"i":0}`)
+	}
+}
+
+func TestReplayDoesNotDisturbLiveDurable(t *testing.T) {
+	b, err := New(Config{URL: startJetStreamServer(t), Stream: "BYTESWARM_REPLAY_LIVE", AckWait: 500 * time.Millisecond}, testLogger())
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	t.Cleanup(func() { _ = b.Close() })
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	live := make(chan event.Event, 8)
+	err = b.Subscribe(ctx, event.SubjectAll, func(_ context.Context, e event.Event) error {
+		select {
+		case live <- e:
+		default:
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Subscribe: %v", err)
+	}
+
+	if err := b.Publish(ctx, event.Event{Type: "live1", WorkflowID: "wf1"}); err != nil {
+		t.Fatalf("publish live1: %v", err)
+	}
+	awaitEventType(t, live, "live1")
+
+	// Replay historical events — must not touch the durable's cursor.
+	_ = collectReplay(t, b, event.SubjectAll, time.Time{})
+
+	// The durable keeps delivering new events from where it left off.
+	if err := b.Publish(ctx, event.Event{Type: "live2", WorkflowID: "wf1"}); err != nil {
+		t.Fatalf("publish live2: %v", err)
+	}
+	awaitEventType(t, live, "live2")
+}
+
+func TestReplaySince(t *testing.T) {
+	b, err := New(Config{URL: startJetStreamServer(t), Stream: "BYTESWARM_REPLAY_SINCE"}, testLogger())
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	t.Cleanup(func() { _ = b.Close() })
+	ctx := context.Background()
+
+	if err := b.Publish(ctx, event.Event{Type: "early", WorkflowID: "wf1"}); err != nil {
+		t.Fatalf("publish early: %v", err)
+	}
+	time.Sleep(150 * time.Millisecond)
+	mark := time.Now()
+	time.Sleep(150 * time.Millisecond)
+	for _, ty := range []string{"late1", "late2"} {
+		if err := b.Publish(ctx, event.Event{Type: ty, WorkflowID: "wf1"}); err != nil {
+			t.Fatalf("publish %s: %v", ty, err)
+		}
+	}
+
+	got := collectReplay(t, b, event.SubjectAll, mark)
+	if len(got) != 2 {
+		t.Fatalf("since-replay returned %d events, want 2 (only after mark): %+v", len(got), got)
+	}
+	if got[0].Type != "late1" || got[1].Type != "late2" {
+		t.Fatalf("since-replay = [%q %q], want [late1 late2]", got[0].Type, got[1].Type)
+	}
+}
+
+func awaitEventType(t *testing.T, ch chan event.Event, wantType string) {
+	t.Helper()
+	select {
+	case e := <-ch:
+		if e.Type != wantType {
+			t.Fatalf("received event %q, want %q", e.Type, wantType)
+		}
+	case <-time.After(8 * time.Second):
+		t.Fatalf("timed out waiting for event %q", wantType)
 	}
 }
