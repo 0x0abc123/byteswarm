@@ -1,0 +1,17 @@
+event: bootstrap-approved
+timestamp: 2026-07-11T01:09:34Z
+actor: 0x0abc123
+stage: bootstrap
+summary: Bootstrap approved — single Go module (cmd/byteswarm + cmd/byteswarmctl, internal/* per ADR-0001) with walking skeleton, CLAUDE.md, GitHub Actions CI, README; CI green after Go toolchain bump to 1.26.5.
+refs:
+  adr: ["0001", "0002", "0003", "0004", "0005", "0007"]
+  commit: null            # set in the chore(state) commit recording this approval
+  pr:
+    - https://github.com/0x0abc123/byteswarm/pull/3   # bootstrap structure
+    - https://github.com/0x0abc123/byteswarm/pull/4   # CI fix (Go toolchain)
+  files:
+    - docs/project-state.yaml
+    - go.mod
+    - .github/workflows/verify.yml
+    - .github/workflows/package.yml
+    - docs/cicd-checklist.md
