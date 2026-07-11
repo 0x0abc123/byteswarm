@@ -146,7 +146,7 @@ correctness gap and leads; F4.4 may expose a subject-scheme constraint (below).
   > - Out of scope: reconnect (F4.2), replay (F4.3), scoping (F4.4), a full dead-letter subsystem.
   > - Acceptance: registry unit tests with a fake Bus whose handler return is observable — all consumers succeed → handler returns nil (ack); a consumer error → handler returns non-nil (Nak/redeliver); a panic is isolated and counts as failure. If a MaxDeliver guard is added, test the give-up path.
 
-- [ ] **F4.2 Reconnect & recovery** · internal/bus · size M · depends on: F4.1
+- [x] **F4.2 Reconnect & recovery** · internal/bus · size M · depends on: F4.1
   > /implement-feature survive NATS disconnects and process restarts without losing position.
   > - Component: internal/bus.
   > - Behavior: configure nats.go reconnection (`nats.RetryOnFailedConnect`, max-reconnects/backoff, reconnect/disconnect handler logs) in `bus.New`; confirm the **durable** consumer (already used) resumes from its stored cursor after a reconnect or restart so unacked events are redelivered (pairs with F4.1). Surface connection state via logs.

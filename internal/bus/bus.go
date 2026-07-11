@@ -214,6 +214,69 @@ func (b *JetStreamBus) Close() error {
 	return nil
 }
 
+// Replay reads historical events back from the stream for audit/replay,
+// calling handle for each matching event in stream order, from `since` (zero
+// time = from the start) up to the stream's last sequence at call time. It is
+// read-only and bounded: it uses an ephemeral, ack-none consumer, so it neither
+// creates nor advances any durable consumer's cursor and never republishes. It
+// does NOT follow live — it stops once caught up to the snapshot, when handle
+// returns an error, or when ctx is cancelled. `subject` filters what to read
+// (e.g. event.SubjectAll for everything, or bw.evt.*.<workflowID> for one
+// workflow).
+func (b *JetStreamBus) Replay(ctx context.Context, subject string, since time.Time, handle func(context.Context, event.Event) error) error {
+	if subject == "" {
+		return errors.New("bus: replay subject is required")
+	}
+	info, err := b.js.StreamInfo(b.stream)
+	if err != nil {
+		return fmt.Errorf("bus: replay stream info: %w", err)
+	}
+	lastSeq := info.State.LastSeq
+	if lastSeq == 0 {
+		return nil // empty stream — nothing to replay
+	}
+
+	start := []nats.SubOpt{nats.AckNone()}
+	if since.IsZero() {
+		start = append(start, nats.DeliverAll())
+	} else {
+		start = append(start, nats.StartTime(since))
+	}
+	// Ephemeral (no Durable) sync subscription: isolated from live durables,
+	// auto-removed on Unsubscribe.
+	sub, err := b.js.SubscribeSync(subject, start...)
+	if err != nil {
+		return fmt.Errorf("bus: replay subscribe: %w", err)
+	}
+	defer func() { _ = sub.Unsubscribe() }()
+
+	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		msg, err := sub.NextMsg(2 * time.Second)
+		if err != nil {
+			if errors.Is(err, nats.ErrTimeout) {
+				return nil // caught up — no more historical messages
+			}
+			return fmt.Errorf("bus: replay next message: %w", err)
+		}
+
+		var w wireEvent
+		if uErr := json.Unmarshal(msg.Data, &w); uErr != nil {
+			b.log.Error("bus: replay skipping undecodable message", "subject", msg.Subject, "err", uErr)
+		} else if hErr := handle(ctx, event.Event{Type: w.Type, WorkflowID: w.WorkflowID, Payload: w.Payload}); hErr != nil {
+			return hErr
+		}
+
+		// Stop at the snapshot boundary so replay is bounded (does not follow
+		// events published after the call began).
+		if meta, mErr := msg.Metadata(); mErr == nil && meta.Sequence.Stream >= lastSeq {
+			return nil
+		}
+	}
+}
+
 // wireEvent is the on-the-wire JSON envelope. A []byte Payload marshals as a
 // base64 string, so arbitrary payloads round-trip losslessly.
 type wireEvent struct {
