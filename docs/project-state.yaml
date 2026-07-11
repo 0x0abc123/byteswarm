@@ -67,7 +67,7 @@ active:
     architecture_style: "0001"   # style stands; consumer-exec dimension amended by 0008
     client_approach: "0002"
     backend_language: "0003"
-    event_bus: "0004"
+    event_bus: "0004"            # event-type token rule superseded by 0010 (single dot-free token)
     data_stores: "0005"          # storage-representation superseded by 0009 (opaque bytes: BYTEA/BLOB)
     deploy_targets: "0006"
     ci_provider: "0007"
@@ -77,7 +77,14 @@ active:
 # Refactors IN FLIGHT only. When a refactor completes, its entry is REMOVED
 # from this list and a completion event is written to docs/state-log/.
 # ---------------------------------------------------------------------------
-refactors: []                 # refactor-0001, refactor-0002 completed (see docs/state-log/)
+refactors:
+  - id: refactor-0003
+    summary: "event Type is a single dot-free subject token (unify bus/server with plugin's rule); enables broker-side workflowID scoping (bw.evt.*.<workflowID>); unblocks F4.4"
+    status: approved
+    approved_by: 0x0abc123
+    affected_stages: [bootstrap]
+    adr_refs: ["0010", "0004"]   # 0010 new (supersedes 0004 on the type-token rule)
+  # refactor-0001, refactor-0002 completed (see docs/state-log/)
   # - id: refactor-0001
   #   summary: "split reporting into its own service"
   #   status: impact_analysis | approved | in_progress

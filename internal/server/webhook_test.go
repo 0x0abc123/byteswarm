@@ -20,7 +20,7 @@ func TestWebhookAuthenticatedPublishes(t *testing.T) {
 	pub := &fakePublisher{}
 	h := webhookTestHandler(pub, "s3cret")
 
-	req := httptest.NewRequest(http.MethodPost, "/webhook", strings.NewReader(`{"type":"order.created","workflowID":"wf1"}`))
+	req := httptest.NewRequest(http.MethodPost, "/webhook", strings.NewReader(`{"type":"order_created","workflowID":"wf1"}`))
 	req.Header.Set("Authorization", "Bearer s3cret")
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)

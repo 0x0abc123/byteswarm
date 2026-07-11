@@ -172,20 +172,17 @@ type wireEvent struct {
 	Payload    []byte `json:"payload,omitempty"`
 }
 
-// subjectFor builds bw.evt.<type>.<workflowID>. Type may contain dots
-// (hierarchical); WorkflowID falls back to "_" when unset. Tokens are bounded
-// and must not contain NATS wildcards or whitespace — defense in depth even
-// though ingress validates.
+// subjectFor builds bw.evt.<type>.<workflowID>. Type is a single dot-free
+// token (event.ValidType, ADR-0010) so it occupies exactly one subject
+// position; WorkflowID falls back to "_" when unset and must not contain NATS
+// wildcards or whitespace (defense in depth even though ingress validates).
 func subjectFor(e event.Event) (string, error) {
-	if e.Type == "" {
-		return "", errors.New("bus: event type is required")
+	if !event.ValidType(e.Type) {
+		return "", fmt.Errorf("bus: invalid event type %q", e.Type)
 	}
 	wf := e.WorkflowID
 	if wf == "" {
 		wf = emptyWorkflowToken
-	}
-	if err := checkToken(e.Type); err != nil {
-		return "", err
 	}
 	if err := checkToken(wf); err != nil {
 		return "", err

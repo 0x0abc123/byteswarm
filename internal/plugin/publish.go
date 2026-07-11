@@ -17,7 +17,6 @@ var ErrInvalidEvent = errors.New("plugin: invalid event from script")
 // subject tokens (ADR-0004 subject: bw.evt.<type>.<workflowID>), so their
 // charset is restricted to prevent subject injection.
 const (
-	maxEventTypeLen      = 128
 	maxWorkflowIDLen     = 128
 	maxScriptPayloadByte = 1 << 20 // 1 MiB
 )
@@ -53,7 +52,7 @@ func NewPublishCapability(pub event.Publisher) *PublishCapability {
 // charset and field bounds — then forwards it via the event.Publisher port. It
 // fails closed: an event that fails validation is never published.
 func (c *PublishCapability) Publish(ctx context.Context, e event.Event) error {
-	if e.Type == "" || len(e.Type) > maxEventTypeLen || !validSubjectToken(e.Type) {
+	if !event.ValidType(e.Type) {
 		return fmt.Errorf("%w: type", ErrInvalidEvent)
 	}
 	if len(e.WorkflowID) > maxWorkflowIDLen || (e.WorkflowID != "" && !validSubjectToken(e.WorkflowID)) {

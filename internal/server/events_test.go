@@ -46,7 +46,7 @@ func TestSubmitEventValid(t *testing.T) {
 	pub := &fakePublisher{}
 	h := testHandler(pub)
 
-	body := `{"type":"order.created","workflowID":"wf1","payload":{"id":7}}`
+	body := `{"type":"order_created","workflowID":"wf1","payload":{"id":7}}`
 	req := httptest.NewRequest(http.MethodPost, "/events", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
@@ -58,8 +58,8 @@ func TestSubmitEventValid(t *testing.T) {
 		t.Fatalf("published %d events, want 1", pub.count())
 	}
 	got := pub.got[0]
-	if got.Type != "order.created" || got.WorkflowID != "wf1" {
-		t.Fatalf("published %+v, want type=order.created workflowID=wf1", got)
+	if got.Type != "order_created" || got.WorkflowID != "wf1" {
+		t.Fatalf("published %+v, want type=order_created workflowID=wf1", got)
 	}
 	if !strings.Contains(string(got.Payload), `"id":7`) {
 		t.Fatalf("payload = %s, want it to carry the submitted JSON", got.Payload)

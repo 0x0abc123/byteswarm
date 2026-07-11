@@ -39,12 +39,12 @@ func startJetStreamServer(t *testing.T) string {
 func testLogger() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }
 
 func TestSubjectForEncoding(t *testing.T) {
-	got, err := subjectFor(event.Event{Type: "order.created", WorkflowID: "wf1"})
+	got, err := subjectFor(event.Event{Type: "order_created", WorkflowID: "wf1"})
 	if err != nil {
 		t.Fatalf("subjectFor: %v", err)
 	}
-	if got != "bw.evt.order.created.wf1" {
-		t.Fatalf("subject = %q, want %q", got, "bw.evt.order.created.wf1")
+	if got != "bw.evt.order_created.wf1" {
+		t.Fatalf("subject = %q, want %q", got, "bw.evt.order_created.wf1")
 	}
 
 	got, err = subjectFor(event.Event{Type: "ping"})
@@ -78,14 +78,14 @@ func TestPublishSubscribeRoundTrip(t *testing.T) {
 	defer cancel()
 
 	got := make(chan event.Event, 1)
-	if err := b.Subscribe(ctx, "bw.evt.order.created.*", func(_ context.Context, e event.Event) error {
+	if err := b.Subscribe(ctx, "bw.evt.order_created.*", func(_ context.Context, e event.Event) error {
 		got <- e
 		return nil
 	}); err != nil {
 		t.Fatalf("Subscribe: %v", err)
 	}
 
-	want := event.Event{Type: "order.created", WorkflowID: "wf1", Payload: []byte(`{"id":7}`)}
+	want := event.Event{Type: "order_created", WorkflowID: "wf1", Payload: []byte(`{"id":7}`)}
 	if err := b.Publish(ctx, want); err != nil {
 		t.Fatalf("Publish: %v", err)
 	}

@@ -12,8 +12,9 @@ import (
 // BroadcastType is the reserved event type for systemwide notices: an event
 // published with this type is delivered to every registered consumer,
 // regardless of its specific subscriptions (architecture brief "global
-// broadcast"). Consumers need not register for it explicitly.
-const BroadcastType = "@broadcast"
+// broadcast"). Consumers need not register for it explicitly. The canonical
+// value lives in the event package (the routing contract, ADR-0010).
+const BroadcastType = event.BroadcastType
 
 // Registry maps event types to the Consumers subscribed to them and dispatches
 // each delivered event to its subscribers, in isolation. It is the in-process

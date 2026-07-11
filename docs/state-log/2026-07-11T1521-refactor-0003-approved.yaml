@@ -1,0 +1,12 @@
+event: refactor-0003-approved
+timestamp: 2026-07-11T15:21:29Z
+actor: 0x0abc123
+stage: refactor-0003
+summary: Approved as analyzed — ADR-0010 (event Type = single dot-free subject token, event.ValidType) supersedes ADR-0004 on the type-token dimension only. Reserved @broadcast sentinel exempt; workflowID left flexible; hierarchical types deferred. Adapter-only (ports unchanged). Unblocks F4.4 (separate feature). Resolves the bus/server-vs-plugin dotted-type split-brain.
+refs:
+  adr: ["0010", "0004"]
+  commit: null
+  files:
+    - docs/adr/0010-event-type-token.md
+    - docs/adr/0004-event-bus.md
+    - docs/project-state.yaml

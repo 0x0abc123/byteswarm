@@ -1,0 +1,9 @@
+event: refactor-0003-proposed
+timestamp: 2026-07-11T15:21:29Z
+actor: 0x0abc123
+stage: refactor-0003
+summary: Proposed constraining event Type to a single dot-free subject token to enable broker-side workflowID scoping and unify the bus/server/plugin validators. Entered impact analysis. Adapter/contract-level; unblocks F4.4.
+refs:
+  adr: ["0004"]
+  commit: null
+  files: [docs/project-state.yaml]
