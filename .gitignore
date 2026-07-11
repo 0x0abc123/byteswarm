@@ -4,3 +4,7 @@ dist/
 __pycache__/
 .venv/
 *.log
+
+# compiled binaries built into the repo root (e.g. `go build ./cmd/byteswarm`)
+/byteswarm
+/byteswarmctl
