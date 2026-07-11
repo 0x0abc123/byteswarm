@@ -1,0 +1,12 @@
+event: refactor-0002-approved
+timestamp: 2026-07-11T13:54:33Z
+actor: 0x0abc123
+stage: refactor-0002
+summary: Approved as analyzed — ADR-0009 (opaque bytes, Postgres BYTEA) supersedes ADR-0005 on the storage-representation dimension only. Adapter-only; re-examine 0006 (pgx via database/sql keeps CGO_ENABLED=0) stands. Regenerate CI (Postgres service) + CLAUDE.md, then build the Postgres BYTEA adapter (F2.2).
+refs:
+  adr: ["0009", "0005", "0006"]
+  commit: null
+  files:
+    - docs/adr/0009-consumer-state-representation.md
+    - docs/adr/0005-data-stores.md
+    - docs/project-state.yaml
