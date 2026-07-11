@@ -1,0 +1,13 @@
+event: refactor-0003-completed
+timestamp: 2026-07-11T15:32:34Z
+actor: 0x0abc123
+stage: refactor-0003
+summary: Completed — ADR-0010 (event Type = single dot-free subject token, event.ValidType) supersedes ADR-0004 on the type-token dimension. Unified the bus/server/plugin type validators into one event-package rule; @broadcast sentinel exempt; ingress now 400s dotted types. Adapter-only (ports unchanged). Resolved the dotted-type split-brain and unblocked F4.4 (workflowID scoping via bw.evt.*.<workflowID>, still a separate feature). CI green incl -race + govulncheck.
+refs:
+  adr: ["0010", "0004"]
+  commit: null
+  pr:
+    - https://github.com/0x0abc123/byteswarm/pull/24
+  files:
+    - docs/adr/0010-event-type-token.md
+    - internal/event/event.go
