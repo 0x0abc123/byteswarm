@@ -1,0 +1,16 @@
+event: refactor-0001-completed
+timestamp: 2026-07-11T08:33:49Z
+actor: 0x0abc123
+stage: refactor-0001
+summary: Completed — JavaScript/goja script-plugin consumer model shipped adapter-only (internal/plugin behind the Consumer port; capability API with exec allowlist, namespaced store, sandboxed fs, validated publish; per-invocation timeout + panic isolation). CI green incl. -race and govulncheck. Composition-root wiring in cmd/byteswarm deferred until the Bus/Repository adapters land.
+refs:
+  adr: ["0008", "0001", "0003"]
+  commit: null            # set in the chore(state) commit recording completion
+  pr:
+    - https://github.com/0x0abc123/byteswarm/pull/6   # refactor implementation
+  files:
+    - internal/plugin/
+    - internal/consumer/port.go
+    - docs/adr/0008-plugin-execution-model.md
+    - docs/c4/components/consumer.mmd
+    - docs/c4/sequences/plugin-invocation.mmd
