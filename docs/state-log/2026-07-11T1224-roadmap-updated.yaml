@@ -1,0 +1,10 @@
+event: roadmap-updated
+timestamp: 2026-07-11T12:24:57Z
+actor: 0x0abc123
+stage: null
+summary: Roadmap refreshed after M1 delivery (F1.1-F1.5 merged). M1 marked complete; M2 (durable state + script plugins live) elaborated into full /implement-feature blocks — SQLite then Postgres Repository adapters (internal/store), wire the goja plugin host into cmd/byteswarm, and the ADR-0006 config file. M3-M5 remain stubs.
+refs:
+  adr: ["0005", "0006", "0008"]
+  commit: null
+  files:
+    - docs/roadmap.md
