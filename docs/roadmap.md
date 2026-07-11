@@ -94,7 +94,7 @@ uncertain piece, so it leads.
   > - Out of scope: composition-root store selection (F2.3), migrations tooling, SQLite (F2.1).
   > - Acceptance: run the shared contract test against Postgres gated on `BYTESWARM_TEST_PG_DSN` (skip cleanly if unset). NOTE: exercising this in CI needs a Postgres **service** in `verify.yml` — there is no pure-Go embedded Postgres, so this is a CI/infra follow-up (regenerate CI via `generate-cicd` or add the service + a checklist item); flag it in the PR rather than editing the generated pipeline by hand.
 
-- [ ] **F2.3 Wire the goja plugin host into the composition root** · cmd/byteswarm · size S · depends on: F2.1, F1.2, F1.5
+- [x] **F2.3 Wire the goja plugin host into the composition root** · cmd/byteswarm · size S · depends on: F2.1, F1.2, F1.5
   > /implement-feature wire internal/plugin's Host so script plugins run as live consumers.
   > - Component: cmd/byteswarm (composition root).
   > - Behavior: construct a `consumer.Repository` (SQLite from F2.1 by default, path from env), then `plugin.NewHost(repo, pub, allow, root, logger)` where `pub` is the bus (F1.5) and `allow`/`root` come from config; parse a plugin config (`plugin.Parse`), `host.LoadAll(cfg)` → `[]*ScriptConsumer`, and register each with `reg.RegisterSubscriber(sc)` so script plugins dispatch alongside the example Go consumer. Fail closed: a plugin that won't load stops startup. Only active when bus + repo are configured.
