@@ -35,6 +35,8 @@ func run(args []string, out io.Writer) error {
 	case "", "version":
 		fmt.Fprintf(out, "byteswarmctl %s\n", version)
 		return nil
+	case "publish":
+		return publishCmd(fs.Args()[1:], out)
 	default:
 		return fmt.Errorf("unknown command %q", cmd)
 	}
