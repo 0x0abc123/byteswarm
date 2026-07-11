@@ -7,7 +7,7 @@ deciders: ["claude (advisor)", "0x0abc123"]
 retrospective: false
 decision_key: event_bus
 supersedes: null
-superseded_by: null
+superseded_by: "0010"       # event-type token rule only; bus/subject/JetStream/port all stand
 tags: [messaging, core, data]
 ---
 
@@ -59,3 +59,12 @@ redelivery on nack/crash, and replay by sequence or time.
   system-of-record event log.
 - In-process Go channels only — no durability or replay; fails the resilience and
   audit requirements.
+
+## Amendment (refactor-0003, see ADR-0010)
+
+The subject shape `bw.evt.<type>.<workflowID>`, NATS JetStream choice, durable
+delivery, and Bus port above **stand**. Superseded on **one dimension only**:
+the event `Type` is now a **single dot-free subject token** (`event.ValidType`),
+so `<type>` occupies exactly one token and workflowID can be pinned by a
+wildcard (`bw.evt.*.<workflowID>`) — the enabling change for workflowID scoping.
+The reserved broadcast sentinel (`@broadcast`) is exempt from the charset.
