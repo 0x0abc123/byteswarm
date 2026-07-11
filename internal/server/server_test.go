@@ -9,7 +9,7 @@ import (
 )
 
 func TestHealthAndReadinessEndpoints(t *testing.T) {
-	h := New(slog.New(slog.NewJSONHandler(io.Discard, nil)))
+	h := New(slog.New(slog.NewJSONHandler(io.Discard, nil)), &fakePublisher{})
 
 	for _, path := range []string{"/healthz", "/readyz"} {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
