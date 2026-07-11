@@ -4,8 +4,10 @@
 // them together (constructor injection only, reference/design-principles.md),
 // and serves until interrupted, shutting down gracefully.
 //
-// The script-plugin host (internal/plugin) and store adapter are wired here in
-// a later feature (roadmap F2.x) once the Repository adapter exists.
+// When BYTESWARM_PLUGINS_CONFIG is set it also opens the SQLite state store,
+// constructs the goja script-plugin host (internal/plugin, ADR-0008), and
+// registers the declared script plugins as consumers alongside compiled-in
+// Go consumers.
 package main
 
 import (
@@ -21,7 +23,9 @@ import (
 	"github.com/0x0abc123/byteswarm/internal/bus"
 	"github.com/0x0abc123/byteswarm/internal/consumer"
 	"github.com/0x0abc123/byteswarm/internal/event"
+	"github.com/0x0abc123/byteswarm/internal/plugin"
 	"github.com/0x0abc123/byteswarm/internal/server"
+	"github.com/0x0abc123/byteswarm/internal/store"
 )
 
 // noBusPublisher is the Publisher used when no event bus is configured
@@ -59,6 +63,33 @@ func main() {
 
 		reg := consumer.NewRegistry(logger)
 		reg.Register(newExampleConsumer(logger), exampleEventType)
+
+		// Runtime script plugins (ADR-0008), when configured. Register them
+		// before Run so they are subscribed before the first delivery.
+		if cfgPath := os.Getenv("BYTESWARM_PLUGINS_CONFIG"); cfgPath != "" {
+			repo, err := store.NewSQLite(storePath())
+			if err != nil {
+				logger.Error("opening plugin state store", slog.String("error", err.Error()))
+				os.Exit(1)
+			}
+			defer func() { _ = repo.Close() }()
+
+			// The exec allowlist stays empty here (deny all exec); it is
+			// populated from the config file in a later feature (F2.4).
+			host := plugin.NewHost(repo, b, plugin.ExecAllowlist{}, pluginsDir(), logger)
+			consumers, err := buildPluginConsumers(host, cfgPath)
+			if err != nil {
+				logger.Error("loading script plugins", slog.String("error", err.Error()))
+				os.Exit(1)
+			}
+			for _, sc := range consumers {
+				reg.RegisterSubscriber(sc)
+			}
+			logger.Info("script plugins loaded", slog.Int("count", len(consumers)))
+		} else {
+			logger.Info("script plugins disabled (BYTESWARM_PLUGINS_CONFIG not set)")
+		}
+
 		go func() {
 			if err := reg.Run(ctx, b); err != nil {
 				logger.Error("consumer registry stopped", slog.String("error", err.Error()))
