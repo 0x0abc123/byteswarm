@@ -1,0 +1,14 @@
+event: refactor-0001-approved
+timestamp: 2026-07-11T07:53:41Z
+actor: 0x0abc123
+stage: refactor-0001
+summary: Refactor approved as analyzed — JavaScript/goja script plugins, adapter-only (ScriptConsumer implements existing Consumer port; Repository namespacing in host shim), trusted-author defense-in-depth sandbox. ADR-0008 authored; ADR-0001/0003 amended; re-examine 0003/0005/0006 resolved as standing.
+refs:
+  adr: ["0008", "0001", "0003", "0005", "0006"]
+  commit: null            # set in the chore(state) commit recording this approval
+  files:
+    - docs/adr/0008-plugin-execution-model.md
+    - docs/adr/0001-architecture-style.md
+    - docs/adr/0003-backend-language.md
+    - docs/architecture-brief.md
+    - docs/project-state.yaml
