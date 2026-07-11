@@ -30,7 +30,7 @@ NATS JetStream adapter (F1.1) carries the most uncertainty, so it goes first.
   > - Out of scope: durable-cursor recovery & explicit ack (F4.1/F4.2), replay (F4.3), workflowID scoping (F4.4), the in-memory bus.
   > - Acceptance: integration test against an embedded/test NATS server — publish then receive the same event; subject encoding asserted. Skips cleanly if no NATS available locally (CI provides one).
 
-- [ ] **F1.2 Consumer registry & dispatch** · internal/consumer · size M · depends on: F1.1
+- [x] **F1.2 Consumer registry & dispatch** · internal/consumer · size M · depends on: F1.1
   > /implement-feature consumer registry that routes delivered events to subscribed Consumers.
   > - Component: internal/consumer (registry over the existing Consumer port)
   > - Behavior: register `Consumer`s by their `Events()`; on a bus delivery, route to every consumer subscribed to that event type; each handler runs panic-recovered and isolated (ADR-0001). A registry `Run(ctx, bus)` subscribes the needed subjects and dispatches. Global-broadcast event type routes to all consumers (F4.5 elaborates edge cases).
