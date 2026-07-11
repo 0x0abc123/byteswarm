@@ -1,0 +1,10 @@
+event: roadmap-updated
+timestamp: 2026-07-11T14:57:23Z
+actor: 0x0abc123
+stage: null
+summary: Roadmap refreshed after M3 delivery (F3.1-F3.2 merged). M4 (resilience & audit) elaborated, folding in reality — F4.1 (at-least-once) re-homed to internal/consumer (registry always-acks gap), F4.2/F4.3 to internal/bus; F4.5 (broadcast) already delivered by F1.2 (ticked); F4.4 (workflowID scoping) flagged as likely refactor-0003 (subject scheme puts workflowID after a dotted type, so broker-side filtering needs reordering the ADR-0004 encoding). internal/workflow stub drift noted. M5 remains a stub.
+refs:
+  adr: ["0004"]
+  commit: null
+  files:
+    - docs/roadmap.md
