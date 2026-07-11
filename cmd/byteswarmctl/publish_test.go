@@ -24,7 +24,7 @@ func TestPublishSendsRequest(t *testing.T) {
 	defer ts.Close()
 
 	var out bytes.Buffer
-	err := publishCmd([]string{"--type", "order.created", "--workflow", "wf1", "--payload", `{"id":7}`, "--addr", ts.URL}, &out)
+	err := publishCmd([]string{"--type", "order_created", "--workflow", "wf1", "--payload", `{"id":7}`, "--addr", ts.URL}, &out)
 	if err != nil {
 		t.Fatalf("publishCmd error: %v", err)
 	}
@@ -33,8 +33,8 @@ func TestPublishSendsRequest(t *testing.T) {
 	if c.method != http.MethodPost || c.path != "/events" {
 		t.Fatalf("request = %s %s, want POST /events", c.method, c.path)
 	}
-	if c.body.Type != "order.created" || c.body.WorkflowID != "wf1" {
-		t.Fatalf("body = %+v, want type=order.created workflowID=wf1", c.body)
+	if c.body.Type != "order_created" || c.body.WorkflowID != "wf1" {
+		t.Fatalf("body = %+v, want type=order_created workflowID=wf1", c.body)
 	}
 	if string(c.body.Payload) != `{"id":7}` {
 		t.Fatalf("payload = %s, want %s", c.body.Payload, `{"id":7}`)

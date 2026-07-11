@@ -28,7 +28,7 @@ func TestRegisterPluginsLoadsAndRegisters(t *testing.T) {
 	host := pluginTestHost(t)
 
 	pcfg := plugin.Config{Plugins: []plugin.PluginConfig{
-		{Name: "greet", Events: []string{"order.created"}, Script: "1"},
+		{Name: "greet", Events: []string{"order_created"}, Script: "1"},
 	}}
 	n, err := registerPlugins(reg, host, pcfg)
 	if err != nil {

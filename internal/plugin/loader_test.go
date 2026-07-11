@@ -10,7 +10,7 @@ func TestParse(t *testing.T) {
 	}{
 		{
 			name: "valid path plugin",
-			json: `{"plugins":[{"name":"greet","events":["order.created"],"path":"greet.js"}]}`,
+			json: `{"plugins":[{"name":"greet","events":["order_created"],"path":"greet.js"}]}`,
 		},
 		{
 			name: "valid inline script plugin",

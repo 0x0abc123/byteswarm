@@ -38,7 +38,7 @@ func TestLoadConfigParsesFile(t *testing.T) {
 		"store": {"driver": "sqlite", "path": "/data/state.db"},
 		"pluginsDir": "/srv/plugins",
 		"execAllow": {"backup": ["/usr/bin/tar", "czf"]},
-		"plugins": [{"name": "greet", "events": ["order.created"], "script": "1"}]
+		"plugins": [{"name": "greet", "events": ["order_created"], "script": "1"}]
 	}`)
 
 	cfg, err := loadConfig(path)

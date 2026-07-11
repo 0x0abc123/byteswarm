@@ -16,7 +16,6 @@ import (
 // fail fast with a 400 rather than deep in the bus adapter.
 const (
 	maxEventBodyBytes = 1 << 20 // 1 MiB total request body
-	maxEventTypeLen   = 128
 	maxWorkflowIDLen  = 128
 )
 
@@ -84,25 +83,20 @@ func acceptEvent(w http.ResponseWriter, r *http.Request, logger *slog.Logger, pu
 // safe, non-leaking message when the request is rejected.
 func validateSubmit(req submitRequest) (string, bool) {
 	switch {
-	case req.Type == "":
-		return "event type is required", false
-	case len(req.Type) > maxEventTypeLen:
-		return "event type too long", false
+	case !event.ValidType(req.Type):
+		return "invalid event type (single token [A-Za-z0-9_-], no dots)", false
 	case len(req.WorkflowID) > maxWorkflowIDLen:
 		return "workflowID too long", false
-	case !validToken(req.Type):
-		return "event type contains illegal characters", false
-	case req.WorkflowID != "" && !validToken(req.WorkflowID):
+	case req.WorkflowID != "" && !validWorkflowID(req.WorkflowID):
 		return "workflowID contains illegal characters", false
 	}
 	return "", true
 }
 
-// validToken rejects whitespace and NATS subject wildcards; dots are allowed so
-// hierarchical event types (e.g. "order.created") pass. (Mirrors the bus
-// adapter's token guard; a future cleanup could hoist this to the event
-// package as the single subject-token rule.)
-func validToken(s string) bool {
+// validWorkflowID rejects whitespace and NATS subject wildcards. The workflowID
+// is the trailing subject token and stays flexible (ADR-0010 constrains only
+// the type); event.ValidType is the single rule for the type token.
+func validWorkflowID(s string) bool {
 	return !strings.ContainsAny(s, " \t\r\n*>")
 }
 

@@ -21,15 +21,15 @@ func testHost(repo consumer.Repository, pub event.Publisher, root string) *Host 
 func TestHostLoadWiresCapabilities(t *testing.T) {
 	h := testHost(&fakeRepo{}, &fakePublisher{}, t.TempDir())
 
-	sc, err := h.Load(PluginConfig{Name: "greet", Events: []string{"order.created"}, Script: "1"})
+	sc, err := h.Load(PluginConfig{Name: "greet", Events: []string{"order_created"}, Script: "1"})
 	if err != nil {
 		t.Fatalf("Load returned error: %v", err)
 	}
 	if sc.Name() != "greet" {
 		t.Fatalf("Name() = %q, want %q", sc.Name(), "greet")
 	}
-	if got := sc.Events(); len(got) != 1 || got[0] != "order.created" {
-		t.Fatalf("Events() = %v, want [order.created]", got)
+	if got := sc.Events(); len(got) != 1 || got[0] != "order_created" {
+		t.Fatalf("Events() = %v, want [order_created]", got)
 	}
 	if sc.caps.Exec == nil || sc.caps.Store == nil || sc.caps.FS == nil || sc.caps.Publish == nil {
 		t.Fatal("Load left a capability unwired")
@@ -52,7 +52,7 @@ func TestHandleRunsScriptEndToEnd(t *testing.T) {
 	// Script reads the event, writes namespaced state, and publishes a derived event.
 	sc, err := h.Load(PluginConfig{
 		Name:   "greet",
-		Events: []string{"order.created"},
+		Events: []string{"order_created"},
 		Script: `host.store.set("last", event.payload.name);
 		         host.publish("greeted", event.workflowID, {greeting: "hi " + event.payload.name});`,
 	})
@@ -60,7 +60,7 @@ func TestHandleRunsScriptEndToEnd(t *testing.T) {
 		t.Fatalf("Load returned error: %v", err)
 	}
 
-	ev := event.Event{Type: "order.created", WorkflowID: "wf1", Payload: []byte(`{"name":"ada"}`)}
+	ev := event.Event{Type: "order_created", WorkflowID: "wf1", Payload: []byte(`{"name":"ada"}`)}
 	if err := sc.Handle(context.Background(), ev); err != nil {
 		t.Fatalf("Handle returned error: %v", err)
 	}

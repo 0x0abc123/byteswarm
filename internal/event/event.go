@@ -18,7 +18,39 @@ const (
 	// the subscription an any-scope instance uses. WorkflowID-scoped
 	// subscriptions are F4.4.
 	SubjectAll = SubjectPrefix + ".>"
+
+	// BroadcastType is the reserved event type for systemwide notices —
+	// delivered to every consumer (see internal/consumer). It intentionally
+	// uses '@' so no ordinary (charset-restricted) type can collide with it;
+	// ValidType exempts it (ADR-0010).
+	BroadcastType = "@broadcast"
+
+	// maxTypeLen bounds an event type token.
+	maxTypeLen = 128
 )
+
+// ValidType reports whether t is a legal event type (ADR-0010): a single
+// subject token — non-empty, at most maxTypeLen, charset [A-Za-z0-9_-] with no
+// dots/whitespace/NATS-wildcards — or the reserved BroadcastType sentinel. A
+// dot-free single token keeps <type> at a fixed subject position so a
+// workflowID can be pinned by a wildcard (bw.evt.*.<workflowID>). This is the
+// single source of truth shared by the bus, HTTP ingress, and plugin publish.
+func ValidType(t string) bool {
+	if t == BroadcastType {
+		return true
+	}
+	if t == "" || len(t) > maxTypeLen {
+		return false
+	}
+	for _, r := range t {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '_', r == '-':
+		default:
+			return false
+		}
+	}
+	return true
+}
 
 // Event is the unit of work byteswarm publishes, routes, and delivers.
 // Subjects encode Type and WorkflowID (e.g. bw.evt.<type>.<workflowID>, ADR-0004).
