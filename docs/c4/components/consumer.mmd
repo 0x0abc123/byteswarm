@@ -1,0 +1,42 @@
+%% C4 L3 — Component diagram for the consumer subsystem (byteswarm Server)
+%% Source of truth: docs/adr/ (ADR-0001, ADR-0005, ADR-0008) + code — regenerate via /c4-designer, do not hand-edit
+%% Generated: 2026-07-11
+%% NOTE: event/consumer/Repository ports reflect code on disk (internal/event, internal/consumer).
+%%       The Consumer port + script-plugin path (internal/plugin) are ADR-0008-derived, built by refactor-0001.
+flowchart TB
+    bus["Event Bus<br/><i>[external system: NATS JetStream]</i>"]
+    tools["External tools & processes<br/><i>[external system]</i>"]
+    db[("State Store<br/><i>[db: PostgreSQL / SQLite]</i>")]
+    pstore[("Plugin store<br/><i>[files: config + JS scripts + sandbox dirs]</i>")]
+
+    subgraph srv [byteswarm Server — consumer subsystem]
+        reg["Consumer registry<br/><i>[component: event type -> Consumer (port)]</i>"]
+        evt["Event model & routing ports<br/><i>[component: event.Bus / event.Publisher]</i>"]
+        repo["Repository (port)<br/><i>[component: per-aggregate state]</i>"]
+        gocon["Native Go consumers<br/><i>[component: compile-time SDK]</i>"]
+        host["Script-plugin host (goja)<br/><i>[component: ScriptConsumer + capability API]</i>"]
+        loader["Plugin config loader<br/><i>[component: parse config, compile scripts]</i>"]
+    end
+
+    bus -->|"delivers subscribed events [via event.Bus]"| reg
+    reg -->|"dispatches event [via Consumer port]"| gocon
+    reg -->|"dispatches event [via Consumer port]"| host
+    loader -->|"loads config, compiles scripts (fail-closed) [filesystem]"| pstore
+    loader -->|"registers ScriptConsumers"| reg
+    gocon -->|"persists state [via Repository]"| repo
+    gocon -->|"publishes derived event [via event.Bus]"| evt
+    host -->|"runs allowlisted command (argv, no shell) [exec capability]"| tools
+    host -->|"read/write namespaced state [via Repository]"| repo
+    host -->|"read/write confined files [fs capability]"| pstore
+    host -->|"publishes derived event [via event.Bus]"| evt
+    repo -->|"backed by [SQL]"| db
+    evt -->|"backed by [NATS]"| bus
+
+    classDef person    fill:#08427b,stroke:#052e56,color:#ffffff
+    classDef internal  fill:#1168bd,stroke:#0b4884,color:#ffffff
+    classDef external  fill:#999999,stroke:#6b6b6b,color:#ffffff
+    classDef datastore fill:#438dd5,stroke:#2e6295,color:#ffffff
+    classDef component fill:#85bbf0,stroke:#5d82a8,color:#000000
+    class reg,evt,repo,gocon,host,loader component
+    class bus,tools external
+    class db,pstore datastore

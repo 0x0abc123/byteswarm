@@ -11,11 +11,16 @@ audit of past events.
 ## Architecture at a glance
 
 byteswarm is a modular monolith built ports-and-adapters style as a single Go
-module. Consumers are in-process plugins compiled into the server binary. The
-main containers are the **server** (event routing and consumer host), the
-**CLI** (`byteswarmctl`, the primary operator client), and a webhook ingress;
-these sit alongside a NATS JetStream event bus and a PostgreSQL/SQLite state
-repository, each reached through a port. See the container diagram at
+module. Consumers come in two kinds behind a single Consumer port: Go consumers
+compiled into the server binary, and JavaScript plugins loaded at runtime from
+config on an embedded goja engine (ADR-0008) — so operators can add or change
+handlers without rebuilding. Script plugins run in a host-mediated sandbox that
+exposes exactly four capabilities (an allowlisted `exec`, a namespaced store, a
+confined filesystem, and event publish). The main containers are the **server**
+(event routing and consumer host), the **CLI** (`byteswarmctl`, the primary
+operator client), and a webhook ingress; these sit alongside a NATS JetStream
+event bus and a PostgreSQL/SQLite state repository, each reached through a port.
+See the container diagram at
 [docs/c4/l2-container.mmd](docs/c4/l2-container.mmd) and the decision records in
 [docs/adr/](docs/adr/) for the full picture.
 
@@ -49,7 +54,8 @@ Configuration is via a config file with environment overrides; see
 | cmd/byteswarm/ | Server binary — composition root (Server container) | docs/c4/l2-container.mmd |
 | cmd/byteswarmctl/ | CLI — primary operator client (CLI container) | ADR-0002 |
 | internal/event/ | Core event model & routing ports (domain) | ADR-0001, ADR-0004 |
-| internal/consumer/ | Consumer registry & plugin SDK; Repository port | ADR-0001, ADR-0005 |
+| internal/consumer/ | Consumer port (native + script) & Repository port (domain) | ADR-0001, ADR-0005, ADR-0008 |
+| internal/plugin/ | Script-plugin host adapter — goja JS runtime + sandboxed capability API (exec/store/fs/publish) | ADR-0008 |
 | internal/workflow/ | Workflow lifecycle: subscription, reconnect, redelivery | ADR-0001, ADR-0004 |
 | internal/auth/ | Authentication port (default shared-secret) | ADR-0002 |
 | internal/server/ | Inbound HTTP adapter — mux, middleware, health | ADR-0002 |

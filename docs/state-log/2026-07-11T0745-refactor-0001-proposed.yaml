@@ -1,0 +1,10 @@
+event: refactor-0001-proposed
+timestamp: 2026-07-11T07:45:00Z
+actor: 0x0abc123
+stage: refactor-0001
+summary: Proposed adding runtime-loaded JavaScript (goja) script-plugin consumers coexisting with compiled-in Go consumers behind the Consumer port, with a sandboxed host capability API (exec allowlist, namespaced store, confined fs, event publish). Entered impact analysis.
+refs:
+  adr: []
+  commit: null
+  files:
+    - docs/project-state.yaml

@@ -62,20 +62,28 @@ active:
   event_bus: nats-jetstream   # behind a Bus port (see adr 0004)
   ci_provider: github         # github | gitlab | jenkins
   deploy_targets: [vm, container, kubernetes]   # serverless excluded
+  plugin_model: script-js+native-go   # goja JS script plugins coexist with compiled-in Go (adr 0008)
   adr_refs:                   # decision key -> ADR id (filename prefix)
-    architecture_style: "0001"
+    architecture_style: "0001"   # style stands; consumer-exec dimension amended by 0008
     client_approach: "0002"
     backend_language: "0003"
     event_bus: "0004"
     data_stores: "0005"
     deploy_targets: "0006"
     ci_provider: "0007"
+    plugin_model: "0008"
 
 # ---------------------------------------------------------------------------
 # Refactors IN FLIGHT only. When a refactor completes, its entry is REMOVED
 # from this list and a completion event is written to docs/state-log/.
 # ---------------------------------------------------------------------------
-refactors: []
+refactors:
+  - id: refactor-0001
+    summary: "add runtime-loaded external script plugins (JavaScript/goja) coexisting with compiled-in Go consumers behind the Consumer port; host exposes a sandboxed capability API (OS-exec allowlist, namespaced repo, sandboxed FS, event publish)"
+    status: approved
+    approved_by: 0x0abc123
+    affected_stages: [c4design, bootstrap]
+    adr_refs: ["0008", "0001", "0003"]   # 0008 new; 0001/0003 amended
   # - id: refactor-0001
   #   summary: "split reporting into its own service"
   #   status: impact_analysis | approved | in_progress

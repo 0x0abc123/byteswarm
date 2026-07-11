@@ -1,0 +1,36 @@
+%% C4 dynamic — Script-plugin invocation (goja sandbox + host capability API)
+%% Source of truth: docs/adr/ (ADR-0008) + docs/architecture-brief.md — regenerate via /c4-designer, do not hand-edit
+%% Generated: 2026-07-11
+sequenceDiagram
+    autonumber
+    participant BUS as Event Bus
+    participant SRV as byteswarm Server
+    participant PLUGINS as Plugin store
+    participant DB as State Store
+    participant TOOLS as External tools & processes
+
+    BUS->>SRV: deliver event (subscribed type + workflowID) [NATS]
+    SRV->>SRV: match event type to script plugin subscription
+    SRV->>PLUGINS: read compiled plugin script (cached) [filesystem]
+    SRV->>SRV: run on pooled goja runtime — inject host API + event payload, start timeout+instruction watchdog
+    Note over SRV: event payload is untrusted input — host validates every capability call and fails closed
+    opt host.exec(name, argv)
+        SRV->>SRV: check name against allowlist (argv only, no shell)
+        SRV->>TOOLS: run allowlisted command [OS exec]
+        TOOLS-->>SRV: stdout / stderr / exit status
+    end
+    opt host.store get/set(key)
+        SRV->>DB: read/write under plugin namespace [SQL]
+        DB-->>SRV: value
+    end
+    opt host.fs read/write(path)
+        SRV->>PLUGINS: access within per-plugin sandbox dir (path confined) [filesystem]
+    end
+    opt host.publish(event)
+        SRV->>BUS: publish derived event [NATS]
+    end
+    alt completes within bounds
+        SRV->>BUS: ack processed event [NATS]
+    else timeout / instruction budget / panic
+        SRV->>SRV: interrupt + recover, log bounded failure (no payload), leave unacked for redelivery
+    end

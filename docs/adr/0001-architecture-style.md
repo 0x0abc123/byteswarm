@@ -7,7 +7,7 @@ deciders: ["claude (advisor)", "0x0abc123"]
 retrospective: false
 decision_key: architecture_style
 supersedes: null
-superseded_by: null
+superseded_by: "0008"       # consumer-execution model only; modular-monolith style stands
 tags: [architecture, core]
 ---
 
@@ -51,3 +51,14 @@ any `workflowID`.
 - Microservices / one service per consumer — rejected: contradicts the in-process
   plugin requirement and imposes distributed-systems ops on a single-operator tool.
 - Distributed actor runtime — over-engineered for ≤10 concurrent workflows.
+
+## Amendment (refactor-0001, see ADR-0008)
+
+The **modular-monolith style, module boundaries, and multi-instance scaling
+above stand unchanged.** Superseded on **one dimension only**: consumers are no
+longer *exclusively* compiled-in. As of ADR-0008, a second consumer kind —
+runtime-loaded JavaScript (goja) script plugins behind the same `Consumer` port —
+coexists with the compiled-in Go consumers. The "misbehaving plugin shares the
+process → panic-recovered, resource-bounded" isolation clause now applies with
+equal force to the script sandbox (per-invocation timeout, instruction budget,
+recovered goroutine).

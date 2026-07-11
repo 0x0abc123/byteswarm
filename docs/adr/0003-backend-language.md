@@ -49,3 +49,15 @@ module producing static binaries.
   HTTP server.
 - Mixed Go + Python — rejected: ADR-0001 is a monolith and no ML/data split exists to
   justify a second language.
+
+## Amendment (refactor-0001, see ADR-0008)
+
+This decision **stands**: the framework server, CLI, and core remain **Go**, a
+single module producing static binaries. Re-examined because the Consequence
+"compile-time registration … no fragile runtime plugin loading" is no longer
+universally true — ADR-0008 adds runtime-loaded **JavaScript (goja)** script
+consumers as a second kind, embedded via a pure-Go engine so the static
+`CGO_ENABLED=0` build is preserved. Restated consequence: Go consumers keep the
+type-safe compile-time SDK; script consumers trade that for
+rebuild-free authoring, with runtime loading confined to a sandboxed adapter
+(`internal/plugin/`). The host/core language is unchanged.

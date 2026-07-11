@@ -4,6 +4,7 @@
 flowchart TB
     operator(["Operator<br/><i>engineer — runs & triggers</i>"])
     author(["Consumer author<br/><i>developer — extends (build-time)</i>"])
+    pauthor(["Plugin author<br/><i>trusted dev — adds JS plugins (runtime/config)</i>"])
 
     subgraph sys [byteswarm]
         bw["byteswarm<br/><i>[container: event-driven automation framework]</i>"]
@@ -17,6 +18,7 @@ flowchart TB
 
     operator -->|"operates & triggers events [CLI]"| bw
     author -->|"authors consumers [Go source, build-time]"| bw
+    pauthor -->|"declares plugins & scripts [JS + config file, runtime]"| bw
     trigger -->|"fires events [webhook/HTTPS]"| bw
     bw -->|"runs commands / launches processes [OS exec]"| tools
     bw -->|"reads from / sends data to [network]"| netsvc
@@ -28,6 +30,6 @@ flowchart TB
     classDef external  fill:#999999,stroke:#6b6b6b,color:#ffffff
     classDef datastore fill:#438dd5,stroke:#2e6295,color:#ffffff
     classDef component fill:#85bbf0,stroke:#5d82a8,color:#000000
-    class operator,author person
+    class operator,author,pauthor person
     class bw internal
     class trigger,tools,netsvc,sinks,logsink external
