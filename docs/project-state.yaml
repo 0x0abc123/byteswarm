@@ -77,13 +77,7 @@ active:
 # Refactors IN FLIGHT only. When a refactor completes, its entry is REMOVED
 # from this list and a completion event is written to docs/state-log/.
 # ---------------------------------------------------------------------------
-refactors:
-  - id: refactor-0003
-    summary: "event Type is a single dot-free subject token (unify bus/server with plugin's rule); enables broker-side workflowID scoping (bw.evt.*.<workflowID>); unblocks F4.4"
-    status: approved
-    approved_by: 0x0abc123
-    affected_stages: [bootstrap]
-    adr_refs: ["0010", "0004"]   # 0010 new (supersedes 0004 on the type-token rule)
+refactors: []                 # refactor-0001, -0002, -0003 completed (see docs/state-log/)
   # refactor-0001, refactor-0002 completed (see docs/state-log/)
   # - id: refactor-0001
   #   summary: "split reporting into its own service"
