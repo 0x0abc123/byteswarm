@@ -65,13 +65,14 @@ func (r *Registry) RegisterSubscriber(s Subscriber) {
 }
 
 // Run subscribes to the event stream on the given bus and dispatches every
-// delivery until ctx is cancelled. M1 semantics: the delivery is acknowledged
-// once dispatch has attempted every subscribed consumer; per-consumer
-// at-least-once ack/redelivery is F4.1.
+// delivery until ctx is cancelled. At-least-once (F4.1): the delivery handler
+// returns an error when any subscribed consumer failed, so the bus Naks and the
+// event is redelivered; consumers must be idempotent (a redelivered event
+// re-runs the type's consumers — a stated non-functional in the brief). The
+// bus bounds redelivery so a permanently-failing event cannot loop forever.
 func (r *Registry) Run(ctx context.Context, bus event.Bus) error {
 	err := bus.Subscribe(ctx, event.SubjectAll, func(hctx context.Context, e event.Event) error {
-		r.dispatch(hctx, e)
-		return nil
+		return r.dispatch(hctx, e)
 	})
 	if err != nil {
 		return fmt.Errorf("consumer: subscribing registry: %w", err)
@@ -82,8 +83,9 @@ func (r *Registry) Run(ctx context.Context, bus event.Bus) error {
 
 // dispatch routes one event to the consumers subscribed to its type (or to all
 // consumers for a broadcast), each isolated so one consumer's error or panic
-// cannot affect the others (ADR-0001).
-func (r *Registry) dispatch(ctx context.Context, e event.Event) {
+// cannot affect the others (ADR-0001). It returns a non-nil error if any
+// consumer failed, so the caller can trigger redelivery.
+func (r *Registry) dispatch(ctx context.Context, e event.Event) error {
 	r.mu.RLock()
 	var targets []Consumer
 	if e.Type == BroadcastType {
@@ -93,24 +95,36 @@ func (r *Registry) dispatch(ctx context.Context, e event.Event) {
 	}
 	r.mu.RUnlock()
 
+	var failed int
 	for _, c := range targets {
-		r.safeHandle(ctx, c, e)
+		if err := r.safeHandle(ctx, c, e); err != nil {
+			failed++
+		}
 	}
+	if failed > 0 {
+		return fmt.Errorf("consumer: %d of %d handler(s) failed for event %q", failed, len(targets), e.Type)
+	}
+	return nil
 }
 
-// safeHandle invokes one consumer, recovering panics and logging errors so a
-// misbehaving consumer cannot down the instance or stop its siblings.
-func (r *Registry) safeHandle(ctx context.Context, c Consumer, e event.Event) {
+// safeHandle invokes one consumer, recovering panics so a misbehaving consumer
+// cannot down the instance or stop its siblings. It returns a non-nil error
+// (logged) when the consumer errored or panicked, so dispatch can count the
+// failure toward redelivery.
+func (r *Registry) safeHandle(ctx context.Context, c Consumer, e event.Event) (err error) {
 	defer func() {
 		if rec := recover(); rec != nil {
 			r.log.Error("consumer: recovered panic in handler",
 				"consumer", consumerName(c), "event_type", e.Type, "panic", rec)
+			err = fmt.Errorf("consumer %s panicked: %v", consumerName(c), rec)
 		}
 	}()
 	if err := c.Handle(ctx, e); err != nil {
 		r.log.Error("consumer: handler returned error",
 			"consumer", consumerName(c), "event_type", e.Type, "err", err)
+		return err
 	}
+	return nil
 }
 
 // consumerName prefers a consumer's declared Name() (e.g. a script plugin) and
