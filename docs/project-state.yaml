@@ -43,11 +43,11 @@ stages:
     artifacts: docs/c4/
 
   bootstrap:                  # skill: bootstrap-structure
-    status: in_progress
-    approved: false
-    approved_by: null
-    approved_at: null
-    ci_green: false           # exit criterion: build + empty test suite + CI pass
+    status: complete
+    approved: true
+    approved_by: 0x0abc123
+    approved_at: 2026-07-11T01:09:34Z
+    ci_green: true            # exit criterion: build + empty test suite + CI pass
     artifacts: "."
 
 # ---------------------------------------------------------------------------
