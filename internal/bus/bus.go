@@ -84,7 +84,31 @@ func New(cfg Config, log *slog.Logger) (*JetStreamBus, error) {
 		ackWait = defaultAckWait
 	}
 
-	opts := append([]nats.Option{nats.Name(cfg.Name), nats.Timeout(timeout)}, cfg.Options...)
+	opts := append([]nats.Option{
+		nats.Name(cfg.Name),
+		nats.Timeout(timeout),
+		// Survive NATS blips and a broker restart: keep retrying the initial
+		// connect and reconnect indefinitely with backoff+jitter (ADR-0004
+		// resilience). Durable consumers resume from their stored cursor on
+		// reconnect, so unacked events are redelivered.
+		nats.RetryOnFailedConnect(true),
+		nats.MaxReconnects(-1),
+		nats.ReconnectWait(2 * time.Second),
+		nats.ReconnectJitter(500*time.Millisecond, 2*time.Second),
+		nats.DisconnectErrHandler(func(_ *nats.Conn, err error) {
+			if err != nil {
+				log.Warn("bus: disconnected from NATS", slog.String("err", err.Error()))
+			} else {
+				log.Info("bus: disconnected from NATS")
+			}
+		}),
+		nats.ReconnectHandler(func(nc *nats.Conn) {
+			log.Info("bus: reconnected to NATS", slog.String("url", nc.ConnectedUrl()))
+		}),
+		nats.ClosedHandler(func(_ *nats.Conn) {
+			log.Warn("bus: NATS connection closed")
+		}),
+	}, cfg.Options...)
 	nc, err := nats.Connect(cfg.URL, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("bus: connecting to NATS: %w", err)
@@ -172,16 +196,22 @@ func (b *JetStreamBus) Subscribe(ctx context.Context, subject string, handle fun
 	if err != nil {
 		return fmt.Errorf("bus: subscribing to %q: %w", subject, err)
 	}
-	go func() {
-		<-ctx.Done()
-		_ = sub.Unsubscribe()
-	}()
+	// Deliberately do NOT Unsubscribe on ctx cancellation: for a durable
+	// consumer, Unsubscribe (and Drain) delete the server-side durable, which
+	// would discard the cursor and prevent resume after a restart (F4.2).
+	// Delivery stops when the connection closes; the durable persists so
+	// unacked events are redelivered to the next instance.
+	_ = sub
 	return nil
 }
 
-// Close drains the connection, flushing pending acks/publishes.
+// Close disconnects from NATS. It uses a hard close rather than Drain: draining
+// unsubscribes, which deletes durable consumers and would discard their cursors
+// (F4.2 needs them to persist for resume). Unacked events are redelivered to
+// the next instance from the durable; consumers are idempotent.
 func (b *JetStreamBus) Close() error {
-	return b.nc.Drain()
+	b.nc.Close()
+	return nil
 }
 
 // wireEvent is the on-the-wire JSON envelope. A []byte Payload marshals as a

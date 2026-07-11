@@ -140,3 +140,84 @@ func TestBoundedRedelivery(t *testing.T) {
 		t.Fatalf("handler invoked %d times, want exactly %d (bounded redelivery)", got, maxDeliver)
 	}
 }
+
+func TestDurableResumeAfterRestart(t *testing.T) {
+	url := startJetStreamServer(t)
+	newBus := func() *JetStreamBus {
+		b, err := New(Config{URL: url, Stream: "BYTESWARM_RESUME", AckWait: 500 * time.Millisecond}, testLogger())
+		if err != nil {
+			t.Fatalf("New: %v", err)
+		}
+		return b
+	}
+	send := func(ch chan struct{}) { // non-blocking so the NATS callback never stalls
+		select {
+		case ch <- struct{}{}:
+		default:
+		}
+	}
+
+	// Instance 1: ack A, leave B unacked (Nak).
+	bus1 := newBus()
+	ctx1, cancel1 := context.WithCancel(context.Background())
+	gotA := make(chan struct{}, 1)
+	gotB1 := make(chan struct{}, 1)
+	err := bus1.Subscribe(ctx1, "bw.evt.>", func(_ context.Context, e event.Event) error {
+		if e.Type == "resumeA" {
+			send(gotA)
+			return nil // ack A -> cursor advances past it
+		}
+		send(gotB1)
+		return errors.New("leave B unacked") // Nak B
+	})
+	if err != nil {
+		t.Fatalf("Subscribe1: %v", err)
+	}
+	if err := bus1.Publish(ctx1, event.Event{Type: "resumeA", WorkflowID: "wf1"}); err != nil {
+		t.Fatalf("publish A: %v", err)
+	}
+	if err := bus1.Publish(ctx1, event.Event{Type: "resumeB", WorkflowID: "wf1"}); err != nil {
+		t.Fatalf("publish B: %v", err)
+	}
+	awaitSignal(t, gotA, "instance 1 to ack A")
+	awaitSignal(t, gotB1, "instance 1 to receive B")
+
+	cancel1()
+	_ = bus1.Close() // durable must persist: B unacked, A acked
+
+	// Instance 2 ("restart"): same durable. Must receive B (unacked) and never
+	// A (acked → not replayed); a deleted+recreated durable would replay A too.
+	bus2 := newBus()
+	ctx2, cancel2 := context.WithCancel(context.Background())
+	defer cancel2()
+	defer func() { _ = bus2.Close() }()
+	got2 := make(chan event.Event, 4)
+	err = bus2.Subscribe(ctx2, "bw.evt.>", func(_ context.Context, e event.Event) error {
+		select {
+		case got2 <- e:
+		default:
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Subscribe2: %v", err)
+	}
+
+	select {
+	case e := <-got2:
+		if e.Type != "resumeB" {
+			t.Fatalf("instance 2 first received %q, want resumeB (A was acked on instance 1 and must not replay)", e.Type)
+		}
+	case <-time.After(8 * time.Second):
+		t.Fatal("instance 2 did not receive the unacked event B — durable did not resume")
+	}
+}
+
+func awaitSignal(t *testing.T, ch chan struct{}, what string) {
+	t.Helper()
+	select {
+	case <-ch:
+	case <-time.After(8 * time.Second):
+		t.Fatalf("timed out waiting for %s", what)
+	}
+}
