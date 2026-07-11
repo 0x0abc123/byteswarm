@@ -3,9 +3,10 @@
 
 # byteswarm
 
-An event-driven automation framework whose consumers are in-process plugins
-compiled into the server binary. Architecture: modular monolith, single Go 1.22
-module, ports-and-adapters (ADR-0001, ADR-0003). Context: docs/adr/, docs/c4/, README.md.
+An event-driven automation framework whose consumers run in-process behind one
+Consumer port: compiled-in Go plugins and runtime-loaded JavaScript scripts (goja,
+ADR-0008). Architecture: modular monolith, single Go 1.22 module, ports-and-adapters
+(ADR-0001, ADR-0003). Context: docs/adr/, docs/c4/, README.md.
 
 ## Workflow
 
@@ -27,7 +28,8 @@ tests, verification, PR). Architecture changes go through
 - Branches: `<type>/<short-description>`. Commits: Conventional Commits.
 - Dispatch the `verifier` subagent for test/lint runs — never run and parse raw test output in the main context.
 - Follow reference/design-principles.md and reference/security-fundamentals.md.
-- Ports-and-adapters is mandatory: domain packages define the ports they consume; adapters (internal/server, and store as it lands) implement them; wiring lives only in cmd/*/main.go. Go style & patterns: reference/stacks/go.md.
+- Ports-and-adapters is mandatory: domain packages define the ports they consume; adapters (internal/server, internal/plugin, and store as it lands) implement them; wiring lives only in cmd/*/main.go. Go style & patterns: reference/stacks/go.md.
+- Script plugins are sandboxed (ADR-0008): the `exec` allowlist is argv-only and fails closed; event payloads and script-supplied paths/keys/argv are untrusted and validated at the host boundary; capability denials are logged and security-reviewed per reference/security-fundamentals.md.
 - Architecture and diagrams are generated from ADRs — never hand-edit docs/c4/*.mmd or this file.
 - `reference/<path>` resolves project-first, then falls back to `.claude/skills/reference/<path>` (framework defaults).
 
@@ -38,7 +40,8 @@ tests, verification, PR). Architecture changes go through
 | cmd/byteswarm/ | Server binary — composition root (Server container) | docs/c4/l2-container.mmd |
 | cmd/byteswarmctl/ | CLI — primary operator client (CLI container) | ADR-0002 |
 | internal/event/ | Core event model & routing ports (domain) | ADR-0001, ADR-0004 |
-| internal/consumer/ | Consumer registry & plugin SDK; Repository port | ADR-0001, ADR-0005 |
+| internal/consumer/ | Consumer port (native + script) & Repository port (domain) | ADR-0001, ADR-0005, ADR-0008 |
+| internal/plugin/ | Script-plugin host adapter — goja JS runtime + sandboxed capability API (exec/store/fs/publish) | ADR-0008 |
 | internal/workflow/ | Workflow lifecycle: subscription, reconnect, redelivery | ADR-0001, ADR-0004 |
 | internal/auth/ | Authentication port (default shared-secret) | ADR-0002 |
 | internal/server/ | Inbound HTTP adapter — mux, middleware, health | ADR-0002 |
@@ -48,15 +51,9 @@ External containers (no code here): NATS JetStream bus (ADR-0004), PostgreSQL/SQ
 
 ## Common commands
 
-Single Go module — run at the repo root:
-
-| Task | Command |
-|---|---|
-| build | `go build ./...` |
-| test | `go test -race -cover ./...` |
-| lint | `go vet ./...` + `test -z "$(gofmt -l .)"` |
-| run | `go run ./cmd/byteswarm` (server) · `go run ./cmd/byteswarmctl` (CLI) |
-
-Full command table (setup, format, vuln scan) & style: reference/stacks/go.md.
+Single Go module — run at the repo root: `go build ./...` · `go test -race -cover ./...`
+· `go vet ./...` + `test -z "$(gofmt -l .)"` · `go run ./cmd/byteswarm` (server) /
+`./cmd/byteswarmctl` (CLI). Full command table (setup, format, vuln scan) & style:
+reference/stacks/go.md.
 
 <!-- CUSTOM: additions below this line are preserved on regeneration -->
