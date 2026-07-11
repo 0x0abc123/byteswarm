@@ -1,0 +1,10 @@
+event: roadmap-updated
+timestamp: 2026-07-11T14:25:01Z
+actor: 0x0abc123
+stage: null
+summary: Roadmap refreshed after M2 delivery (F2.1-F2.4 merged; F2.2 shipped as BYTEA via refactor-0002/ADR-0009). M3 (authenticated webhook ingress) elaborated into full /implement-feature blocks — F3.1 shared-secret authenticator behind the existing auth.Authenticator port, F3.2 POST /webhook that authenticates then publishes. M4-M5 remain stubs.
+refs:
+  adr: ["0002", "0009"]
+  commit: null
+  files:
+    - docs/roadmap.md
