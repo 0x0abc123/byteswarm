@@ -21,6 +21,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/0x0abc123/byteswarm/internal/auth"
 	"github.com/0x0abc123/byteswarm/internal/bus"
 	"github.com/0x0abc123/byteswarm/internal/consumer"
 	"github.com/0x0abc123/byteswarm/internal/event"
@@ -99,9 +100,17 @@ func main() {
 		logger.Warn("no NATS URL configured: running without event bus; POST /events will fail until configured")
 	}
 
+	// Shared-secret authenticator for the webhook ingress (ADR-0002). An empty
+	// secret (BYTESWARM_WEBHOOK_SECRET unset) denies all callers — /webhook is
+	// effectively closed until a secret is configured (fail closed).
+	webhookAuth := auth.NewSharedSecret(cfg.WebhookSecret)
+	if cfg.WebhookSecret == "" {
+		logger.Warn("BYTESWARM_WEBHOOK_SECRET not set: POST /webhook will reject all requests until configured")
+	}
+
 	srv := &http.Server{
 		Addr:    cfg.HTTPAddr,
-		Handler: server.New(logger, pub),
+		Handler: server.New(logger, pub, webhookAuth),
 		// Bound the request read to defend against slow-client attacks
 		// (reference/security-fundamentals.md: request timeouts on every server).
 		ReadHeaderTimeout: 10 * time.Second,

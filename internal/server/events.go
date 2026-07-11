@@ -28,49 +28,56 @@ type submitRequest struct {
 	Payload    json.RawMessage `json:"payload,omitempty"`
 }
 
-// submitEvent handles POST /events: it decodes and bounds the body, validates
-// the event at the boundary, publishes via the Publisher port, and returns 202
-// Accepted. Nothing is published unless validation passes (fail closed).
+// submitEvent handles POST /events: the operator-local event ingress. It
+// simply accepts the event (no auth — the CLI is operator-local per ADR-0002).
 func submitEvent(logger *slog.Logger, pub event.Publisher) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		r.Body = http.MaxBytesReader(w, r.Body, maxEventBodyBytes)
-		dec := json.NewDecoder(r.Body)
-		dec.DisallowUnknownFields()
-
-		var req submitRequest
-		if err := dec.Decode(&req); err != nil {
-			var maxErr *http.MaxBytesError
-			if errors.As(err, &maxErr) {
-				writeError(w, http.StatusRequestEntityTooLarge, "event body too large")
-				return
-			}
-			writeError(w, http.StatusBadRequest, "invalid event body")
-			return
-		}
-		if dec.More() {
-			writeError(w, http.StatusBadRequest, "body must contain a single JSON event")
-			return
-		}
-		if msg, ok := validateSubmit(req); !ok {
-			writeError(w, http.StatusBadRequest, msg)
-			return
-		}
-
-		e := event.Event{Type: req.Type, WorkflowID: req.WorkflowID, Payload: req.Payload}
-		if err := pub.Publish(r.Context(), e); err != nil {
-			logger.ErrorContext(r.Context(), "server: publishing submitted event failed",
-				slog.String("event_type", e.Type),
-				slog.String("correlation_id", CorrelationIDFrom(r.Context())),
-				slog.String("err", err.Error()),
-			)
-			writeError(w, http.StatusInternalServerError, "could not accept event")
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusAccepted)
-		_, _ = w.Write([]byte(`{"status":"accepted"}`))
+		acceptEvent(w, r, logger, pub)
 	}
+}
+
+// acceptEvent decodes and bounds the request body, validates the event at the
+// boundary, publishes via the Publisher port, and writes 202 Accepted. Nothing
+// is published unless validation passes (fail closed). Shared by the CLI-facing
+// /events ingress and the authenticated /webhook ingress.
+func acceptEvent(w http.ResponseWriter, r *http.Request, logger *slog.Logger, pub event.Publisher) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxEventBodyBytes)
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+
+	var req submitRequest
+	if err := dec.Decode(&req); err != nil {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			writeError(w, http.StatusRequestEntityTooLarge, "event body too large")
+			return
+		}
+		writeError(w, http.StatusBadRequest, "invalid event body")
+		return
+	}
+	if dec.More() {
+		writeError(w, http.StatusBadRequest, "body must contain a single JSON event")
+		return
+	}
+	if msg, ok := validateSubmit(req); !ok {
+		writeError(w, http.StatusBadRequest, msg)
+		return
+	}
+
+	e := event.Event{Type: req.Type, WorkflowID: req.WorkflowID, Payload: req.Payload}
+	if err := pub.Publish(r.Context(), e); err != nil {
+		logger.ErrorContext(r.Context(), "server: publishing submitted event failed",
+			slog.String("event_type", e.Type),
+			slog.String("correlation_id", CorrelationIDFrom(r.Context())),
+			slog.String("err", err.Error()),
+		)
+		writeError(w, http.StatusInternalServerError, "could not accept event")
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+	_, _ = w.Write([]byte(`{"status":"accepted"}`))
 }
 
 // validateSubmit enforces the boundary invariants; the bool is false with a

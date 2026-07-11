@@ -11,6 +11,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/0x0abc123/byteswarm/internal/auth"
 	"github.com/0x0abc123/byteswarm/internal/event"
 )
 
@@ -38,7 +39,7 @@ func (p *fakePublisher) count() int {
 }
 
 func testHandler(pub event.Publisher) http.Handler {
-	return New(slog.New(slog.NewJSONHandler(io.Discard, nil)), pub)
+	return New(slog.New(slog.NewJSONHandler(io.Discard, nil)), pub, auth.NewSharedSecret("test-secret"))
 }
 
 func TestSubmitEventValid(t *testing.T) {
