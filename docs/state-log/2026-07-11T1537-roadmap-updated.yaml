@@ -1,0 +1,10 @@
+event: roadmap-updated
+timestamp: 2026-07-11T15:37:40Z
+actor: 0x0abc123
+stage: null
+summary: Roadmap refreshed after refactor-0003 landed. F4.4 (workflowID subscription scoping) flipped from a flagged likely-refactor to a ready size-S internal/bus feature — event.ValidType made <type> a single token, so bw.evt.*.<workflowID> now pins the workflowID. Stale subject-scheme constraint note corrected. F4.1-F4.3 unchanged; F4.5 already done; M5 stub.
+refs:
+  adr: ["0010"]
+  commit: null
+  files:
+    - docs/roadmap.md
