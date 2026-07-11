@@ -1,0 +1,9 @@
+event: refactor-0002-proposed
+timestamp: 2026-07-11T13:54:33Z
+actor: 0x0abc123
+stage: refactor-0002
+summary: Proposed clarifying ADR-0005 storage representation — consumer state is opaque bytes, Postgres should use BYTEA (SQLite BLOB conformant), JSONB deferred. Entered impact analysis. Adapter-only; unblocks F2.2.
+refs:
+  adr: ["0005"]
+  commit: null
+  files: [docs/project-state.yaml]
