@@ -7,6 +7,19 @@ package event
 
 import "context"
 
+// Subject-scheme constants for the event bus (ADR-0004). The routing contract
+// lives here in the domain so the bus adapter and in-process routers agree on
+// one encoding; the bus adapter owns the full per-event encoding.
+const (
+	// SubjectPrefix namespaces every byteswarm event subject
+	// (bw.evt.<type>.<workflowID>).
+	SubjectPrefix = "bw.evt"
+	// SubjectAll matches every byteswarm event (any type, any workflowID) —
+	// the subscription an any-scope instance uses. WorkflowID-scoped
+	// subscriptions are F4.4.
+	SubjectAll = SubjectPrefix + ".>"
+)
+
 // Event is the unit of work byteswarm publishes, routes, and delivers.
 // Subjects encode Type and WorkflowID (e.g. bw.evt.<type>.<workflowID>, ADR-0004).
 type Event struct {
