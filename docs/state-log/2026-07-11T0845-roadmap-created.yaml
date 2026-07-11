@@ -1,0 +1,10 @@
+event: roadmap-created
+timestamp: 2026-07-11T08:45:45Z
+actor: 0x0abc123
+stage: null
+summary: Feature build-out planned in docs/roadmap.md — 5 milestones. M1 (elaborated) is the tracer bullet (CLI publish -> NATS -> built-in Go consumer via new internal/bus + registry + ingress); M2 adds Repository adapters and wires the goja plugin host; M3 webhook/auth; M4 resilience/replay; M5 telemetry. Advice, not pipeline state.
+refs:
+  adr: []
+  commit: null
+  files:
+    - docs/roadmap.md
