@@ -4,10 +4,11 @@
 // them together (constructor injection only, reference/design-principles.md),
 // and serves until interrupted, shutting down gracefully.
 //
-// When BYTESWARM_PLUGINS_CONFIG is set it also opens the SQLite state store,
-// constructs the goja script-plugin host (internal/plugin, ADR-0008), and
-// registers the declared script plugins as consumers alongside compiled-in
-// Go consumers.
+// Configuration comes from a committable JSON file (BYTESWARM_CONFIG) with
+// environment overrides (ADR-0006). When it declares plugins, main opens the
+// SQLite state store, constructs the goja script-plugin host (internal/plugin,
+// ADR-0008) with the configured exec allowlist, and registers the declared
+// script plugins as consumers alongside compiled-in Go consumers.
 package main
 
 import (
@@ -43,17 +44,18 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	addr := os.Getenv("BYTESWARM_HTTP_ADDR")
-	if addr == "" {
-		addr = ":8080"
+	cfg, err := loadConfig(os.Getenv("BYTESWARM_CONFIG"))
+	if err != nil {
+		logger.Error("loading configuration", slog.String("error", err.Error()))
+		os.Exit(1)
 	}
 
 	// Wire the event bus and consumer registry if a broker is configured.
 	// Without one, the server still serves health endpoints; POST /events
 	// fails closed via noBusPublisher.
 	var pub event.Publisher = noBusPublisher{}
-	if natsURL := os.Getenv("BYTESWARM_NATS_URL"); natsURL != "" {
-		b, err := bus.New(bus.Config{URL: natsURL, Name: "byteswarm-server"}, logger)
+	if cfg.NATSURL != "" {
+		b, err := bus.New(bus.Config{URL: cfg.NATSURL, Name: "byteswarm-server"}, logger)
 		if err != nil {
 			logger.Error("connecting to event bus", slog.String("error", err.Error()))
 			os.Exit(1)
@@ -64,30 +66,25 @@ func main() {
 		reg := consumer.NewRegistry(logger)
 		reg.Register(newExampleConsumer(logger), exampleEventType)
 
-		// Runtime script plugins (ADR-0008), when configured. Register them
-		// before Run so they are subscribed before the first delivery.
-		if cfgPath := os.Getenv("BYTESWARM_PLUGINS_CONFIG"); cfgPath != "" {
-			repo, err := store.NewSQLite(storePath())
+		// Runtime script plugins (ADR-0008), when declared in config. Register
+		// them before Run so they are subscribed before the first delivery.
+		if len(cfg.Plugins) > 0 {
+			repo, err := store.NewSQLite(cfg.Store.Path)
 			if err != nil {
 				logger.Error("opening plugin state store", slog.String("error", err.Error()))
 				os.Exit(1)
 			}
 			defer func() { _ = repo.Close() }()
 
-			// The exec allowlist stays empty here (deny all exec); it is
-			// populated from the config file in a later feature (F2.4).
-			host := plugin.NewHost(repo, b, plugin.ExecAllowlist{}, pluginsDir(), logger)
-			consumers, err := buildPluginConsumers(host, cfgPath)
+			host := plugin.NewHost(repo, b, plugin.ExecAllowlist(cfg.ExecAllow), cfg.PluginsDir, logger)
+			n, err := registerPlugins(reg, host, plugin.Config{Plugins: cfg.Plugins})
 			if err != nil {
 				logger.Error("loading script plugins", slog.String("error", err.Error()))
 				os.Exit(1)
 			}
-			for _, sc := range consumers {
-				reg.RegisterSubscriber(sc)
-			}
-			logger.Info("script plugins loaded", slog.Int("count", len(consumers)))
+			logger.Info("script plugins loaded", slog.Int("count", n))
 		} else {
-			logger.Info("script plugins disabled (BYTESWARM_PLUGINS_CONFIG not set)")
+			logger.Info("no script plugins configured")
 		}
 
 		go func() {
@@ -97,13 +94,13 @@ func main() {
 			}
 		}()
 		logger.Info("event bus connected; consumer registry running",
-			slog.String("nats_url", natsURL))
+			slog.String("nats_url", cfg.NATSURL))
 	} else {
-		logger.Warn("BYTESWARM_NATS_URL not set: running without event bus; POST /events will fail until configured")
+		logger.Warn("no NATS URL configured: running without event bus; POST /events will fail until configured")
 	}
 
 	srv := &http.Server{
-		Addr:    addr,
+		Addr:    cfg.HTTPAddr,
 		Handler: server.New(logger, pub),
 		// Bound the request read to defend against slow-client attacks
 		// (reference/security-fundamentals.md: request timeouts on every server).
@@ -111,7 +108,7 @@ func main() {
 	}
 
 	go func() {
-		logger.Info("byteswarm server listening", slog.String("addr", addr))
+		logger.Info("byteswarm server listening", slog.String("addr", cfg.HTTPAddr))
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("server error", slog.String("error", err.Error()))
 			stop()

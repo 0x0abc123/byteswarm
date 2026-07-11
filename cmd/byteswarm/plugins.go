@@ -2,44 +2,23 @@ package main
 
 import (
 	"fmt"
-	"os"
 
+	"github.com/0x0abc123/byteswarm/internal/consumer"
 	"github.com/0x0abc123/byteswarm/internal/plugin"
 )
 
-// buildPluginConsumers reads the plugin config at configPath, parses it, and
-// loads (compiles) every declared plugin into a ScriptConsumer via the host.
-// It fails closed: any read/parse/compile error is returned so the caller can
-// refuse to start rather than run with missing or broken plugins (ADR-0008).
-func buildPluginConsumers(host *plugin.Host, configPath string) ([]*plugin.ScriptConsumer, error) {
-	data, err := os.ReadFile(configPath)
+// registerPlugins loads (compiles) every declared plugin via the host and
+// registers each as a ScriptConsumer on the registry. It fails closed: a
+// plugin that will not compile aborts the whole set so the server can refuse
+// to start rather than run with a partially-loaded plugin set (ADR-0008).
+// Returns the number of plugins registered.
+func registerPlugins(reg *consumer.Registry, host *plugin.Host, pcfg plugin.Config) (int, error) {
+	consumers, err := host.LoadAll(pcfg)
 	if err != nil {
-		return nil, fmt.Errorf("reading plugin config %q: %w", configPath, err)
+		return 0, fmt.Errorf("loading script plugins: %w", err)
 	}
-	cfg, err := plugin.Parse(data)
-	if err != nil {
-		return nil, fmt.Errorf("parsing plugin config %q: %w", configPath, err)
+	for _, sc := range consumers {
+		reg.RegisterSubscriber(sc)
 	}
-	consumers, err := host.LoadAll(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("loading plugins from %q: %w", configPath, err)
-	}
-	return consumers, nil
-}
-
-// storePath resolves the SQLite state-store path (BYTESWARM_STORE_PATH), with a
-// sane default for single-node deployments.
-func storePath() string {
-	if p := os.Getenv("BYTESWARM_STORE_PATH"); p != "" {
-		return p
-	}
-	return "byteswarm.db"
-}
-
-// pluginsDir resolves the per-plugin sandbox root (BYTESWARM_PLUGINS_DIR).
-func pluginsDir() string {
-	if d := os.Getenv("BYTESWARM_PLUGINS_DIR"); d != "" {
-		return d
-	}
-	return "plugins"
+	return len(consumers), nil
 }
