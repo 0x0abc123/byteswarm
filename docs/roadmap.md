@@ -87,7 +87,7 @@ uncertain piece, so it leads.
   > - Out of scope: PostgreSQL (F2.2), plugin/host wiring (F2.3), a migrations tool, per-consumer table-per-aggregate (single namespaced table is enough now — the plugin store shim already prefixes keys).
   > - Acceptance: integration test on a temp-file DB (`t.TempDir()`) — Save→Load round-trip; overwrite; missing key → `(nil, nil)`; the shared contract test passes. Justify the `modernc.org/sqlite` dep in the PR (permitted tier: the ADR-0005 SQLite driver under the no-cgo invariant).
 
-- [ ] **F2.2 PostgreSQL Repository adapter (JSONB)** · internal/store · size M · depends on: F2.1
+- [x] **F2.2 PostgreSQL Repository adapter (BYTEA, ADR-0009)** · internal/store · size M · depends on: F2.1
   > /implement-feature PostgreSQL adapter for the consumer.Repository port.
   > - Component: internal/store (second adapter behind the same port; `database/sql` + **pgx** — default dependency tier, ADR-0005).
   > - Behavior: `NewPostgres(dsn)` against a `consumer_state(id TEXT PRIMARY KEY, state JSONB, updated_at)` table (JSONB per ADR-0005), same `Load`/`Save` contract and missing-key semantics as F2.1; parameterised queries; DSN from env/config, never hard-coded. Reuse F2.1's Repository contract test to prove behavioral parity.
@@ -101,7 +101,7 @@ uncertain piece, so it leads.
   > - Out of scope: the committable config-file format (F2.4 — here read from env/simple source), Postgres selection UX, auth (M3).
   > - Acceptance: extract a testable wiring helper (build+register ScriptConsumers from a `plugin.Config` + `Host` + fake repo) and unit-test it with a tiny inline-`script` plugin (assert the consumer is registered for its declared events); build stays green. Live end-to-end validated manually/CI.
 
-- [ ] **F2.4 Server config file (ADR-0006) carrying plugin declarations** · cmd/byteswarm · size S · depends on: F2.3
+- [x] **F2.4 Server config file (ADR-0006) carrying plugin declarations** · cmd/byteswarm · size S · depends on: F2.3
   > /implement-feature introduce the committable JSON config file with env overrides.
   > - Component: cmd/byteswarm (composition root reads config).
   > - Behavior: a single JSON config file (path from `BYTESWARM_CONFIG`) providing http addr, NATS URL, store selection+DSN/path, plugins dir, the exec allowlist, and the `plugins` declarations — with **environment variables overriding** file values (ADR-0006: file is the committable base, env overrides per-deployment/secrets). Consolidates the scattered `BYTESWARM_*` env reads; secrets stay in env, never the committed file (security-fundamentals). Uses stdlib `encoding/json` (no new dep unless a friendlier format is later chosen).

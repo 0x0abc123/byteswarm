@@ -1,0 +1,14 @@
+event: refactor-0002-completed
+timestamp: 2026-07-11T14:18:19Z
+actor: 0x0abc123
+stage: refactor-0002
+summary: Completed — ADR-0009 (opaque-bytes state, Postgres BYTEA / SQLite BLOB) supersedes ADR-0005 on the storage-representation dimension. PostgreSQL Repository adapter shipped (adapter-only, port unchanged); CI runs the BYTEA contract test against a postgres service; delivers roadmap F2.2. CGO_ENABLED=0 build preserved (pgx via database/sql). CI green.
+refs:
+  adr: ["0009", "0005"]
+  commit: null
+  pr:
+    - https://github.com/0x0abc123/byteswarm/pull/18
+  files:
+    - docs/adr/0009-consumer-state-representation.md
+    - internal/store/postgres.go
+    - .github/workflows/verify.yml
