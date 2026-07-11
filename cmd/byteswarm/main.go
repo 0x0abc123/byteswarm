@@ -16,8 +16,18 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/0x0abc123/byteswarm/internal/event"
 	"github.com/0x0abc123/byteswarm/internal/server"
 )
+
+// unwiredPublisher is a fail-closed placeholder Publisher until F1.5 wires the
+// NATS bus as the real Publisher at this composition root. Until then POST
+// /events returns 500 rather than silently dropping events.
+type unwiredPublisher struct{}
+
+func (unwiredPublisher) Publish(context.Context, event.Event) error {
+	return errors.New("event publisher not wired yet (roadmap F1.5)")
+}
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
@@ -29,7 +39,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:    addr,
-		Handler: server.New(logger),
+		Handler: server.New(logger, unwiredPublisher{}),
 		// Bound the request read to defend against slow-client attacks
 		// (reference/security-fundamentals.md: request timeouts on every server).
 		ReadHeaderTimeout: 10 * time.Second,

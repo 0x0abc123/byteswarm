@@ -9,15 +9,19 @@ package server
 import (
 	"log/slog"
 	"net/http"
+
+	"github.com/0x0abc123/byteswarm/internal/event"
 )
 
-// New builds the HTTP handler: the health/readiness endpoints plus the
-// standard middleware chain. Business routes (the webhook ingress, authorized
-// through the auth port) are added as features land.
-func New(logger *slog.Logger) http.Handler {
+// New builds the HTTP handler: the health/readiness endpoints, the event
+// submit endpoint, and the standard middleware chain. The Publisher port is
+// injected (constructor injection, wired at the composition root); the
+// authenticated external-trigger webhook is added in a later feature.
+func New(logger *slog.Logger, pub event.Publisher) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", writeStatus("ok"))
 	mux.HandleFunc("GET /readyz", writeStatus("ready"))
+	mux.HandleFunc("POST /events", submitEvent(logger, pub))
 	return correlationID(requestLogger(logger)(mux))
 }
 
