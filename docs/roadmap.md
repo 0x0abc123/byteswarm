@@ -37,7 +37,7 @@ NATS JetStream adapter (F1.1) carries the most uncertainty, so it goes first.
   > - Out of scope: the NATS wiring itself (F1.1), main composition (F1.5), script consumers (already implement the port — no change here), at-least-once ack (F4.1).
   > - Acceptance: unit tests with a fake Bus — dispatch to the right consumers by type, one consumer's panic doesn't stop the others, unknown type is a no-op.
 
-- [ ] **F1.3 Event submit HTTP endpoint** · internal/server · size S · depends on: F1.1
+- [x] **F1.3 Event submit HTTP endpoint** · internal/server · size S · depends on: F1.1
   > /implement-feature HTTP endpoint that accepts an event submission and publishes it.
   > - Component: internal/server (inbound adapter; calls event.Publisher)
   > - Behavior: `POST /events` accepts a JSON event (type, workflowID, payload), validates & bounds it at the boundary (security-fundamentals), publishes via the Publisher port, returns 202. Reuses the existing correlation-ID/logging middleware.
