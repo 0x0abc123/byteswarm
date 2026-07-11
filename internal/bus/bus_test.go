@@ -2,8 +2,10 @@ package bus
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -97,5 +99,44 @@ func TestPublishSubscribeRoundTrip(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("did not receive published event within 5s")
+	}
+}
+
+func TestBoundedRedelivery(t *testing.T) {
+	url := startJetStreamServer(t)
+	b, err := New(Config{URL: url, Stream: "BYTESWARM_REDELIVER", AckWait: 150 * time.Millisecond}, testLogger())
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	t.Cleanup(func() { _ = b.Close() })
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var calls atomic.Int64
+	err = b.Subscribe(ctx, "bw.evt.poison.*", func(_ context.Context, _ event.Event) error {
+		calls.Add(1)
+		return errors.New("always fails")
+	})
+	if err != nil {
+		t.Fatalf("Subscribe: %v", err)
+	}
+
+	if err := b.Publish(ctx, event.Event{Type: "poison", WorkflowID: "wf1", Payload: []byte("x")}); err != nil {
+		t.Fatalf("Publish: %v", err)
+	}
+
+	// A permanently-failing event is redelivered up to maxDeliver times, then
+	// terminated — it must not loop forever.
+	// Generous ceiling: the loop exits the instant it reaches maxDeliver, so a
+	// large bound only matters under heavy CI/-race load (MaxDeliver makes
+	// over-counting impossible; the only failure mode is being too slow).
+	deadline := time.Now().Add(15 * time.Second)
+	for time.Now().Before(deadline) && calls.Load() < int64(maxDeliver) {
+		time.Sleep(50 * time.Millisecond)
+	}
+	time.Sleep(500 * time.Millisecond) // settle: confirm no further redelivery
+	if got := calls.Load(); got != int64(maxDeliver) {
+		t.Fatalf("handler invoked %d times, want exactly %d (bounded redelivery)", got, maxDeliver)
 	}
 }

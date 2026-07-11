@@ -120,6 +120,57 @@ func TestBroadcastReachesAllConsumers(t *testing.T) {
 	}
 }
 
+func TestDispatchReturnsErrorWhenConsumerFails(t *testing.T) {
+	r := NewRegistry(testLogger())
+	r.Register(&errorConsumer{}, "type.a")
+	if err := r.dispatch(context.Background(), event.Event{Type: "type.a"}); err == nil {
+		t.Fatal("dispatch should return an error when a consumer fails (→ redelivery)")
+	}
+}
+
+func TestDispatchReturnsErrorWhenConsumerPanics(t *testing.T) {
+	r := NewRegistry(testLogger())
+	r.Register(panicConsumer{}, "type.a")
+	if err := r.dispatch(context.Background(), event.Event{Type: "type.a"}); err == nil {
+		t.Fatal("dispatch should return an error when a consumer panics (recovered, counts as failure)")
+	}
+}
+
+func TestDispatchReturnsNilWhenAllSucceed(t *testing.T) {
+	r := NewRegistry(testLogger())
+	r.Register(&recordingConsumer{}, "type.a")
+	r.Register(&recordingConsumer{}, "type.a")
+	if err := r.dispatch(context.Background(), event.Event{Type: "type.a"}); err != nil {
+		t.Fatalf("dispatch should return nil when all consumers succeed, got %v", err)
+	}
+	// An unknown type has no consumers → no failure.
+	if err := r.dispatch(context.Background(), event.Event{Type: "type.unknown"}); err != nil {
+		t.Fatalf("dispatch of an unsubscribed type should return nil, got %v", err)
+	}
+}
+
+func TestRunHandlerReportsFailureForRedelivery(t *testing.T) {
+	r := NewRegistry(testLogger())
+	r.Register(&errorConsumer{}, "type.a")
+
+	fb := newFakeBus()
+	ctx, cancel := context.WithCancel(context.Background())
+	runErr := make(chan error, 1)
+	go func() { runErr <- r.Run(ctx, fb) }()
+
+	<-fb.subscribed
+	if err := fb.handler(ctx, event.Event{Type: "type.a"}); err == nil {
+		t.Fatal("Run's delivery handler should return an error when a consumer fails, so the bus Naks and redelivers")
+	}
+
+	cancel()
+	select {
+	case <-runErr:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Run did not return after ctx cancel")
+	}
+}
+
 func TestRunSubscribesToAllAndDispatches(t *testing.T) {
 	rec := &recordingConsumer{}
 	r := NewRegistry(testLogger())

@@ -29,6 +29,11 @@ const (
 	emptyWorkflowToken = "_"
 	// defaultStream is the JetStream stream name when Config.Stream is unset.
 	defaultStream = "BYTESWARM"
+	// defaultAckWait is the redelivery interval when Config.AckWait is unset.
+	defaultAckWait = 30 * time.Second
+	// maxDeliver bounds redelivery so a permanently-failing ("poison") event
+	// cannot loop forever; on the final failed attempt it is terminated.
+	maxDeliver = 5
 
 	maxTokenLen = 256
 )
@@ -41,15 +46,17 @@ type Config struct {
 	Stream  string        // JetStream stream name; defaults to "BYTESWARM"
 	Name    string        // client connection name (observability)
 	Timeout time.Duration // connect timeout; defaults to 5s
+	AckWait time.Duration // redelivery interval for unacked messages; defaults to 30s
 	Options []nats.Option // TLS/creds and other options wired by the composition root
 }
 
 // JetStreamBus implements event.Bus over NATS JetStream.
 type JetStreamBus struct {
-	nc     *nats.Conn
-	js     nats.JetStreamContext
-	stream string
-	log    *slog.Logger
+	nc      *nats.Conn
+	js      nats.JetStreamContext
+	stream  string
+	ackWait time.Duration
+	log     *slog.Logger
 }
 
 // compile-time proof the adapter satisfies the domain port.
@@ -72,6 +79,10 @@ func New(cfg Config, log *slog.Logger) (*JetStreamBus, error) {
 	if timeout == 0 {
 		timeout = 5 * time.Second
 	}
+	ackWait := cfg.AckWait
+	if ackWait == 0 {
+		ackWait = defaultAckWait
+	}
 
 	opts := append([]nats.Option{nats.Name(cfg.Name), nats.Timeout(timeout)}, cfg.Options...)
 	nc, err := nats.Connect(cfg.URL, opts...)
@@ -87,7 +98,7 @@ func New(cfg Config, log *slog.Logger) (*JetStreamBus, error) {
 		nc.Close()
 		return nil, err
 	}
-	return &JetStreamBus{nc: nc, js: js, stream: stream, log: log}, nil
+	return &JetStreamBus{nc: nc, js: js, stream: stream, ackWait: ackWait, log: log}, nil
 }
 
 // ensureStream creates the stream if it does not already exist.
@@ -143,12 +154,21 @@ func (b *JetStreamBus) Subscribe(ctx context.Context, subject string, handle fun
 		}
 		e := event.Event{Type: w.Type, WorkflowID: w.WorkflowID, Payload: w.Payload}
 		if err := handle(ctx, e); err != nil {
+			// Bound redelivery: terminate a poison event on its final attempt
+			// rather than let it loop forever. Logged, never silently dropped.
+			if meta, mErr := msg.Metadata(); mErr == nil && meta.NumDelivered >= maxDeliver {
+				b.log.Error("bus: giving up on event after max deliveries",
+					"subject", msg.Subject, "deliveries", meta.NumDelivered, "err", err)
+				_ = msg.Term()
+				return
+			}
 			b.log.Error("bus: handler failed; will redeliver", "subject", msg.Subject, "err", err)
 			_ = msg.Nak()
 			return
 		}
 		_ = msg.Ack()
-	}, nats.Durable(durableName(subject)), nats.ManualAck(), nats.DeliverAll())
+	}, nats.Durable(durableName(subject)), nats.ManualAck(), nats.DeliverAll(),
+		nats.MaxDeliver(maxDeliver), nats.AckWait(b.ackWait))
 	if err != nil {
 		return fmt.Errorf("bus: subscribing to %q: %w", subject, err)
 	}
