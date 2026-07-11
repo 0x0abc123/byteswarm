@@ -44,7 +44,7 @@ NATS JetStream adapter (F1.1) carries the most uncertainty, so it goes first.
   > - Out of scope: webhook auth + the trigger-source endpoint (M3), CLI (F1.4), replay/audit endpoints (M4).
   > - Acceptance: handler tests with a fake Publisher — valid submit → 202 + published; malformed/oversize → 400, nothing published.
 
-- [ ] **F1.4 CLI `publish` command** · cmd/byteswarmctl · size S · depends on: F1.3
+- [x] **F1.4 CLI `publish` command** · cmd/byteswarmctl · size S · depends on: F1.3
   > /implement-feature CLI publish subcommand that submits an event to the server.
   > - Component: cmd/byteswarmctl (consumes the F1.3 HTTP contract)
   > - Behavior: `byteswarmctl publish --type T --workflow W --payload '<json>'` (server addr from flag/env) POSTs to `/events`, reports the result/exit code. Stdlib flag package, matching the existing `version` command style.
