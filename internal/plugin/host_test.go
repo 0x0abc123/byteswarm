@@ -5,18 +5,26 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/0x0abc123/byteswarm/internal/consumer"
 	"github.com/0x0abc123/byteswarm/internal/event"
 )
 
-func TestHostNewConsumerWiresCapabilities(t *testing.T) {
+func testHost(repo consumer.Repository, pub event.Publisher, root string) *Host {
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	h := NewHost(&fakeRepo{}, &fakePublisher{}, ExecAllowlist{"backup": {"/usr/bin/tar"}}, "/srv/plugins", log)
+	return NewHost(repo, pub, ExecAllowlist{"backup": {"/usr/bin/tar"}}, root, log)
+}
 
-	sc := h.NewConsumer(PluginConfig{Name: "greet", Events: []string{"order.created"}, Path: "greet.js"})
+func TestHostLoadWiresCapabilities(t *testing.T) {
+	h := testHost(&fakeRepo{}, &fakePublisher{}, t.TempDir())
 
+	sc, err := h.Load(PluginConfig{Name: "greet", Events: []string{"order.created"}, Script: "1"})
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
 	if sc.Name() != "greet" {
 		t.Fatalf("Name() = %q, want %q", sc.Name(), "greet")
 	}
@@ -24,14 +32,109 @@ func TestHostNewConsumerWiresCapabilities(t *testing.T) {
 		t.Fatalf("Events() = %v, want [order.created]", got)
 	}
 	if sc.caps.Exec == nil || sc.caps.Store == nil || sc.caps.FS == nil || sc.caps.Publish == nil {
-		t.Fatal("NewConsumer left a capability unwired")
+		t.Fatal("Load left a capability unwired")
 	}
 }
 
 func TestScriptConsumerSatisfiesPort(t *testing.T) {
 	var c consumer.Consumer = &ScriptConsumer{name: "x"}
-	// Handle fails closed until the goja runtime is wired.
+	// A consumer with no compiled program fails closed rather than running.
 	if err := c.Handle(context.Background(), event.Event{Type: "t"}); !errors.Is(err, ErrNotImplemented) {
-		t.Fatalf("Handle error = %v, want ErrNotImplemented", err)
+		t.Fatalf("Handle(no program) error = %v, want ErrNotImplemented", err)
+	}
+}
+
+func TestHandleRunsScriptEndToEnd(t *testing.T) {
+	repo := &fakeRepo{}
+	pub := &fakePublisher{}
+	h := testHost(repo, pub, t.TempDir())
+
+	// Script reads the event, writes namespaced state, and publishes a derived event.
+	sc, err := h.Load(PluginConfig{
+		Name:   "greet",
+		Events: []string{"order.created"},
+		Script: `host.store.set("last", event.payload.name);
+		         host.publish("greeted", event.workflowID, {greeting: "hi " + event.payload.name});`,
+	})
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+
+	ev := event.Event{Type: "order.created", WorkflowID: "wf1", Payload: []byte(`{"name":"ada"}`)}
+	if err := sc.Handle(context.Background(), ev); err != nil {
+		t.Fatalf("Handle returned error: %v", err)
+	}
+
+	if repo.lastKey != "greet:last" {
+		t.Fatalf("store key = %q, want %q (namespaced)", repo.lastKey, "greet:last")
+	}
+	if len(pub.got) != 1 {
+		t.Fatalf("published %d events, want 1", len(pub.got))
+	}
+	if pub.got[0].Type != "greeted" || pub.got[0].WorkflowID != "wf1" {
+		t.Fatalf("published event = %+v, want type=greeted workflowID=wf1", pub.got[0])
+	}
+	if !strings.Contains(string(pub.got[0].Payload), "hi ada") {
+		t.Fatalf("published payload = %s, want it to contain %q", pub.got[0].Payload, "hi ada")
+	}
+}
+
+func TestHandleTimeoutInterruptsRunawayScript(t *testing.T) {
+	h := testHost(&fakeRepo{}, &fakePublisher{}, t.TempDir())
+	h.Timeout = 100 * time.Millisecond
+
+	sc, err := h.Load(PluginConfig{Name: "loop", Events: []string{"x"}, Script: "while(true){}"})
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+
+	done := make(chan error, 1)
+	go func() { done <- sc.Handle(context.Background(), event.Event{Type: "x"}) }()
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("Handle(infinite loop) returned nil, want a timeout error")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Handle did not return; timeout watchdog failed to interrupt the script")
+	}
+}
+
+func TestHandleScriptErrorFailsClosed(t *testing.T) {
+	h := testHost(&fakeRepo{}, &fakePublisher{}, t.TempDir())
+	sc, err := h.Load(PluginConfig{Name: "boom", Events: []string{"x"}, Script: `throw new Error("boom")`})
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if err := sc.Handle(context.Background(), event.Event{Type: "x"}); err == nil {
+		t.Fatal("Handle(throwing script) returned nil, want an error (event left unacked)")
+	}
+}
+
+func TestHandleDeniedExecPropagates(t *testing.T) {
+	h := testHost(&fakeRepo{}, &fakePublisher{}, t.TempDir())
+	// "rm" is not on the allowlist; the denial must surface as a script error.
+	sc, err := h.Load(PluginConfig{Name: "danger", Events: []string{"x"}, Script: `host.exec("rm", ["-rf", "/"])`})
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if err := sc.Handle(context.Background(), event.Event{Type: "x"}); err == nil {
+		t.Fatal("Handle(denied exec) returned nil, want an error from the allowlist denial")
+	}
+}
+
+func TestLoadCompileErrorFailsClosed(t *testing.T) {
+	h := testHost(&fakeRepo{}, &fakePublisher{}, t.TempDir())
+	if _, err := h.Load(PluginConfig{Name: "bad", Events: []string{"x"}, Script: "function ("}); err == nil {
+		t.Fatal("Load(uncompilable script) returned nil error, want compile failure (plugin does not start)")
+	}
+}
+
+func TestSourcePathEscapeRejected(t *testing.T) {
+	h := testHost(&fakeRepo{}, &fakePublisher{}, t.TempDir())
+	for _, bad := range []string{"../evil.js", "/etc/passwd"} {
+		if _, err := h.Load(PluginConfig{Name: "esc", Events: []string{"x"}, Path: bad}); err == nil {
+			t.Fatalf("Load(path=%q) returned nil error, want a path-escape/refusal", bad)
+		}
 	}
 }

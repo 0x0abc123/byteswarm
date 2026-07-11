@@ -1,14 +1,28 @@
 package plugin
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"os/exec"
 )
 
 // ErrCommandDenied is returned when a script asks to run a command whose
 // logical name is not in the host allowlist. Callers log this as a security
 // event (without payloads or secrets) per ADR-0008.
 var ErrCommandDenied = errors.New("plugin: command not in exec allowlist")
+
+// ErrExecArgs is returned when script-supplied arguments exceed the host
+// bounds. All external input is bounded at the boundary
+// (reference/security-fundamentals.md).
+var ErrExecArgs = errors.New("plugin: too many or too large exec arguments")
+
+// Argument bounds for a single script-supplied exec call.
+const (
+	maxExecArgs   = 64
+	maxExecArgLen = 4096
+)
 
 // ExecAllowlist maps a logical command name to a fixed argv template. The
 // template is the trusted, host-defined command line; script-supplied
@@ -47,14 +61,44 @@ func (c *ExecCapability) Allowed(name string) bool {
 }
 
 // Run resolves name against the allowlist (deny-by-default) and executes the
-// fixed argv template with args appended. The guard is real; the process
-// launch (exec.CommandContext, argv-only, no shell) is attached with the goja
-// runtime.
-func (c *ExecCapability) Run(_ context.Context, name string, _ []string) (ExecResult, error) {
-	if !c.Allowed(name) {
+// fixed argv template with the script-supplied args appended as a pure argv
+// array. There is no shell: the binary is invoked directly (ADR-0008: no
+// `sh -c`, no interpolation), so script arguments cannot inject a command. A
+// non-zero exit is a normal result reported in ExitCode, not a host error;
+// only a failure to launch returns an error. The invocation context carries
+// the per-invocation deadline, so a runaway child is killed with the script.
+func (c *ExecCapability) Run(ctx context.Context, name string, args []string) (ExecResult, error) {
+	tmpl, ok := c.allow[name]
+	if !ok || len(tmpl) == 0 {
 		return ExecResult{}, ErrCommandDenied
 	}
-	// TODO(code-migration): exec.CommandContext(ctx, template[0], append(template[1:], args...)...)
-	// with a context timeout and OS-level limits on the child (ADR-0008).
-	return ExecResult{}, ErrNotImplemented
+	if len(args) > maxExecArgs {
+		return ExecResult{}, ErrExecArgs
+	}
+	for _, a := range args {
+		if len(a) > maxExecArgLen {
+			return ExecResult{}, ErrExecArgs
+		}
+	}
+
+	argv := append(append([]string(nil), tmpl[1:]...), args...)
+	cmd := exec.CommandContext(ctx, tmpl[0], argv...)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+
+	err := cmd.Run()
+	res := ExecResult{Stdout: stdout.Bytes(), Stderr: stderr.Bytes()}
+	if cmd.ProcessState != nil {
+		res.ExitCode = cmd.ProcessState.ExitCode()
+	}
+	if err != nil {
+		var ee *exec.ExitError
+		if errors.As(err, &ee) {
+			// The command ran and exited non-zero: that is data for the
+			// script (ExitCode), not a host-side failure.
+			return res, nil
+		}
+		return res, fmt.Errorf("plugin exec %q: %w", name, err)
+	}
+	return res, nil
 }

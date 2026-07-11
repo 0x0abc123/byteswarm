@@ -11,16 +11,14 @@
 // directory), and publish (Bus) — each validated at the host boundary because
 // the event payload is untrusted input (reference/security-fundamentals.md).
 //
-// Walking skeleton: the goja runtime itself (github.com/dop251/goja) is wired
-// by the code-migration step. Everything here builds on the standard library —
-// the host-boundary guards (allowlist deny-by-default, namespace prefixing,
-// path confinement) are real; the goja-, OS-, and I/O-touching bodies are
-// placeholders returning ErrNotImplemented until the engine is attached.
+// The goja runtime (github.com/dop251/goja) executes each plugin on a fresh,
+// panic-recovered runtime with a per-invocation timeout; the host-boundary
+// guards (allowlist deny-by-default, key namespacing, path confinement, event
+// validation) are enforced in the capability shims.
 package plugin
 
 import "errors"
 
-// ErrNotImplemented marks a placeholder whose real body is attached with the
-// goja runtime (code-migration step, ADR-0008). It fails closed: an
-// unwired capability refuses rather than silently succeeding.
-var ErrNotImplemented = errors.New("plugin: not implemented until goja runtime is wired")
+// ErrNotImplemented is returned by a ScriptConsumer that has no compiled
+// program — an unloaded consumer fails closed rather than silently succeeding.
+var ErrNotImplemented = errors.New("plugin: script consumer has no compiled program")

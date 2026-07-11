@@ -2,6 +2,8 @@ package plugin
 
 import (
 	"errors"
+	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -10,6 +12,13 @@ import (
 // its per-plugin sandbox directory. Callers log this as a security event per
 // ADR-0008.
 var ErrPathEscape = errors.New("plugin: path escapes sandbox")
+
+// ErrFileTooLarge is returned when a read or write exceeds the sandbox file
+// size bound (reference/security-fundamentals.md: bound all input).
+var ErrFileTooLarge = errors.New("plugin: file exceeds sandbox size limit")
+
+// maxSandboxFileBytes bounds a single sandboxed read or write.
+const maxSandboxFileBytes = 8 << 20 // 8 MiB
 
 // SandboxedFS is the script `fs` capability: file access confined to a
 // per-plugin base directory (ADR-0008). Every path is resolved and checked to
@@ -39,22 +48,77 @@ func (f *SandboxedFS) Resolve(name string) (string, error) {
 	return full, nil
 }
 
-// ReadFile reads a confined file. The path guard is real; the read itself
-// (with symlink-escape check) is attached with the goja runtime.
-func (f *SandboxedFS) ReadFile(name string) ([]byte, error) {
-	if _, err := f.Resolve(name); err != nil {
-		return nil, err
+// realBase ensures the sandbox directory exists and returns its symlink-
+// resolved real path, used to re-check containment after symlink resolution.
+func (f *SandboxedFS) realBase() (string, error) {
+	if err := os.MkdirAll(f.base, 0o750); err != nil {
+		return "", err
 	}
-	// TODO(code-migration): open with O_NOFOLLOW-equivalent symlink guard, os.ReadFile.
-	return nil, ErrNotImplemented
+	return filepath.EvalSymlinks(f.base)
 }
 
-// WriteFile writes a confined file. The path guard is real; the write itself
-// (with symlink-escape check) is attached with the goja runtime.
-func (f *SandboxedFS) WriteFile(name string, _ []byte) error {
-	if _, err := f.Resolve(name); err != nil {
+// within reports whether real is base or lies beneath it.
+func within(real, base string) bool {
+	return real == base || strings.HasPrefix(real, base+string(filepath.Separator))
+}
+
+// ReadFile reads a confined file. Beyond the lexical guard in Resolve, the
+// real (symlink-resolved) path is re-checked against the real sandbox root, so
+// a symlink planted inside the sandbox cannot read outside it.
+func (f *SandboxedFS) ReadFile(name string) ([]byte, error) {
+	full, err := f.Resolve(name)
+	if err != nil {
+		return nil, err
+	}
+	base, err := f.realBase()
+	if err != nil {
+		return nil, err
+	}
+	real, err := filepath.EvalSymlinks(full)
+	if err != nil {
+		return nil, err
+	}
+	if !within(real, base) {
+		return nil, ErrPathEscape
+	}
+	info, err := os.Stat(real)
+	if err != nil {
+		return nil, err
+	}
+	if info.Size() > maxSandboxFileBytes {
+		return nil, ErrFileTooLarge
+	}
+	return os.ReadFile(real)
+}
+
+// WriteFile writes a confined file, creating parent directories within the
+// sandbox. The parent directory's real path is re-checked after symlink
+// resolution so a symlinked directory cannot redirect the write outside base.
+func (f *SandboxedFS) WriteFile(name string, data []byte) error {
+	if len(data) > maxSandboxFileBytes {
+		return ErrFileTooLarge
+	}
+	full, err := f.Resolve(name)
+	if err != nil {
 		return err
 	}
-	// TODO(code-migration): symlink-guarded create/write within base.
-	return ErrNotImplemented
+	base, err := f.realBase()
+	if err != nil {
+		return err
+	}
+	dir := filepath.Dir(full)
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		return err
+	}
+	realDir, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		return err
+	}
+	if !within(realDir, base) {
+		return ErrPathEscape
+	}
+	if err := os.WriteFile(full, data, 0o600); err != nil {
+		return fmt.Errorf("plugin sandbox write: %w", err)
+	}
+	return nil
 }
