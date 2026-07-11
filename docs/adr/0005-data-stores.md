@@ -7,7 +7,7 @@ deciders: ["claude (advisor)", "0x0abc123"]
 retrospective: false
 decision_key: data_stores
 supersedes: null
-superseded_by: null
+superseded_by: "0009"       # storage-representation dimension only; port/PG-default/SQLite/pgx stand
 tags: [data, persistence]
 ---
 
@@ -53,3 +53,12 @@ deployments.
 - Redis as primary state — rejected: not durable-of-record enough for consumer state.
 - Free-for-all per-consumer stores with no port — rejected: the port permits variety
   without mandating infrastructure or losing testability.
+
+## Amendment (refactor-0002, see ADR-0009)
+
+The Repository port, PostgreSQL-default / SQLite-embedded split, and
+`database/sql` + `pgx` choice above **stand**. Superseded on **one dimension
+only**: the concrete storage representation. The `Repository` port stores
+**opaque bytes**, so PostgreSQL uses a **`BYTEA`** column (not JSONB) and SQLite
+a `BLOB`. JSONB / document-query is deferred until the port exposes JSON-typed
+state (ADR-0009).
