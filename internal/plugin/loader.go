@@ -36,14 +36,16 @@ func Parse(data []byte) (Config, error) {
 	if err := dec.Decode(&c); err != nil {
 		return Config{}, fmt.Errorf("parsing plugin config: %w", err)
 	}
-	if err := c.validate(); err != nil {
+	if err := c.Validate(); err != nil {
 		return Config{}, err
 	}
 	return c, nil
 }
 
-// validate enforces the per-plugin invariants at the host boundary.
-func (c Config) validate() error {
+// Validate enforces the per-plugin invariants at the host boundary. It is
+// exported so plugin declarations assembled from another source (e.g. the
+// server config file) can be validated without round-tripping through JSON.
+func (c Config) Validate() error {
 	seen := make(map[string]struct{}, len(c.Plugins))
 	for i, p := range c.Plugins {
 		switch {
