@@ -114,7 +114,7 @@ uncertain piece, so it leads.
 
 ## M3 — External systems trigger events securely over the webhook.
 
-- [ ] **F3.1 Shared-secret authenticator** · internal/auth · size S · depends on: —
+- [x] **F3.1 Shared-secret authenticator** · internal/auth · size S · depends on: —
   > /implement-feature shared-secret adapter for the auth.Authenticator port.
   > - Component: internal/auth (adapter implementing the existing `Authenticator` port: `Authenticate(ctx, credential string) error`).
   > - Behavior: `NewSharedSecret(secret string) *SharedSecret` (or returning `auth.Authenticator`). `Authenticate` compares the presented credential to the configured secret using a **constant-time comparison** (`crypto/subtle.ConstantTimeCompare`) and returns `auth.ErrUnauthenticated` on any mismatch, empty credential, OR empty configured secret — deny by default, fail closed (reference/security-fundamentals.md). Never log the secret or the credential. The secret arrives from config/env at the composition root, never hard-coded.

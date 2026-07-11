@@ -6,10 +6,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/0x0abc123/byteswarm/internal/auth"
 )
 
 func TestHealthAndReadinessEndpoints(t *testing.T) {
-	h := New(slog.New(slog.NewJSONHandler(io.Discard, nil)), &fakePublisher{})
+	h := New(slog.New(slog.NewJSONHandler(io.Discard, nil)), &fakePublisher{}, auth.NewSharedSecret("test-secret"))
 
 	for _, path := range []string{"/healthz", "/readyz"} {
 		req := httptest.NewRequest(http.MethodGet, path, nil)

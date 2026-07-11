@@ -26,6 +26,12 @@ type appConfig struct {
 	PluginsDir string                `json:"pluginsDir"`
 	ExecAllow  map[string][]string   `json:"execAllow"`
 	Plugins    []plugin.PluginConfig `json:"plugins"`
+
+	// WebhookSecret is the shared secret authenticating POST /webhook. It is a
+	// secret, so it comes ONLY from the environment (BYTESWARM_WEBHOOK_SECRET),
+	// never the committed config file (json:"-"). Empty → the webhook denies
+	// all callers (fail closed).
+	WebhookSecret string `json:"-"`
 }
 
 // loadConfig reads the JSON config at path (empty path → defaults only),
@@ -84,6 +90,9 @@ func applyConfigEnvOverrides(c *appConfig) {
 	}
 	if v := os.Getenv("BYTESWARM_PLUGINS_DIR"); v != "" {
 		c.PluginsDir = v
+	}
+	if v := os.Getenv("BYTESWARM_WEBHOOK_SECRET"); v != "" {
+		c.WebhookSecret = v
 	}
 }
 
