@@ -24,8 +24,6 @@ import (
 )
 
 const (
-	// subjectPrefix namespaces every byteswarm event subject (ADR-0004).
-	subjectPrefix = "bw.evt"
 	// emptyWorkflowToken stands in for an unset WorkflowID (broadcast events)
 	// so a subject always has a well-formed final token.
 	emptyWorkflowToken = "_"
@@ -103,7 +101,7 @@ func ensureStream(js nats.JetStreamContext, stream string) error {
 	}
 	if _, err := js.AddStream(&nats.StreamConfig{
 		Name:     stream,
-		Subjects: []string{subjectPrefix + ".>"},
+		Subjects: []string{event.SubjectAll},
 	}); err != nil {
 		return fmt.Errorf("bus: creating stream %q: %w", stream, err)
 	}
@@ -192,7 +190,7 @@ func subjectFor(e event.Event) (string, error) {
 	if err := checkToken(wf); err != nil {
 		return "", err
 	}
-	return subjectPrefix + "." + e.Type + "." + wf, nil
+	return event.SubjectPrefix + "." + e.Type + "." + wf, nil
 }
 
 func checkToken(s string) error {

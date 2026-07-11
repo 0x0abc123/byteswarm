@@ -23,7 +23,7 @@ Foundations, minimally: the Bus backbone + dispatch + ingress + CLI contract,
 proven by the lowest-risk consumer kind (compiled-in Go). Risk-forward: the
 NATS JetStream adapter (F1.1) carries the most uncertainty, so it goes first.
 
-- [ ] **F1.1 NATS JetStream Bus adapter** · internal/bus · size M · depends on: —
+- [x] **F1.1 NATS JetStream Bus adapter** · internal/bus · size M · depends on: —
   > /implement-feature NATS JetStream adapter for the event.Bus port.
   > - Component: internal/bus (new module; adapter implementing internal/event.Bus)
   > - Behavior: connect to NATS JetStream (URL from config/env, ADR-0004/0006); `Publish` maps an Event to subject `bw.evt.<type>.<workflowID>`; `Subscribe(subject, handle)` binds a durable pull/push consumer and invokes handle per message. Connection lifecycle owned here; domain stays transport-free. Ack/redelivery semantics deferred to M4 — M1 uses simple auto-ack to prove the path.
