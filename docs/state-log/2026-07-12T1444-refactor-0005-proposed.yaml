@@ -1,0 +1,9 @@
+event: refactor-0005-proposed
+timestamp: 2026-07-12T14:44:00Z
+actor: 0x0abc123
+stage: refactor-0005
+summary: Proposed a new contained goja JavaScript job-runner binary (byteswarm-job) so operators write long-running/daemonized event-handler jobs in JS on the bundled engine (no Node, no bash wrapper). A plugin triggers it via the exec allowlist by job NAME resolved within an operator-controlled jobs dir; the runner self-daemonizes in Go and grants a broad-but-defined host API (publish via the /events socket, unrestricted exec, open fs, http + raw sockets, log) — deliberately outside the ADR-0008 sandbox (operator-authored, operator-located). No host.store, no direct NATS. Adds a third static binary; extends ADR-0008 and updates ADR-0006. Entered impact analysis.
+refs:
+  adr: ["0006", "0008"]
+  commit: null
+  files: [docs/project-state.yaml]
