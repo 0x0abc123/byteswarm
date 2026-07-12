@@ -1,6 +1,6 @@
 %% C4 L2 — Container diagram for byteswarm
 %% Source of truth: docs/adr/ — regenerate via /c4-designer, do not hand-edit
-%% Generated: 2026-07-10
+%% Generated: 2026-07-12
 flowchart TB
     operator(["Operator<br/><i>engineer</i>"])
     pauthor(["Plugin author<br/><i>trusted dev</i>"])
@@ -21,8 +21,8 @@ flowchart TB
 
     operator -->|"runs [shell]"| cli
     pauthor -->|"declares plugins & authors scripts [config + JS]"| plugins
-    cli -->|"submits events & commands [JSON/HTTPS]"| srv
-    trigger -->|"fires events (shared-secret auth) [webhook/HTTPS]"| srv
+    cli -->|"submits events & commands, operator-local (0660 socket perms) [JSON over Unix domain socket]"| srv
+    trigger -->|"fires events (shared-secret auth) [webhook/HTTPS/TCP]"| srv
     srv -->|"loads plugin config & scripts, confines plugin file I/O [filesystem]"| plugins
     srv -->|"publishes events [NATS]"| bus
     bus -->|"delivers & redelivers events, at-least-once [NATS]"| srv

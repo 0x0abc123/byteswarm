@@ -38,15 +38,15 @@ tests, verification, PR). Architecture changes go through
 | Path | Purpose | Design |
 |---|---|---|
 | cmd/byteswarm/ | Server binary — composition root (Server container) | docs/c4/l2-container.mmd |
-| cmd/byteswarmctl/ | CLI — primary operator client (CLI container) | ADR-0002 |
+| cmd/byteswarmctl/ | CLI — primary operator client (CLI container) | ADR-0011 |
 | internal/event/ | Core event model & routing ports (domain) | ADR-0001, ADR-0004 |
 | internal/consumer/ | Consumer port (native + script) & Repository port (domain) | ADR-0001, ADR-0005, ADR-0009, ADR-0008 |
 | internal/store/ | Repository-port adapters — PostgreSQL (BYTEA) + SQLite (BLOB); consumer state is opaque bytes | ADR-0005, ADR-0009 |
 | internal/plugin/ | Script-plugin host adapter — goja JS runtime + sandboxed capability API (exec/store/fs/publish) | ADR-0008 |
 | internal/workflow/ | Workflow lifecycle: subscription, reconnect, redelivery | ADR-0001, ADR-0004 |
 | internal/bus/ | Event-bus adapter — NATS JetStream publish + durable subscription (event.Bus port) | ADR-0004 |
-| internal/auth/ | Authentication port (default shared-secret) | ADR-0002 |
-| internal/server/ | Inbound HTTP adapter — mux, middleware, health | ADR-0002 |
+| internal/auth/ | Authentication port (default shared-secret) | ADR-0011 |
+| internal/server/ | Inbound HTTP adapter — dual-listener: /events over Unix domain socket (operator-local, OS-permission bounded), /webhook + health over TCP | ADR-0011 |
 | internal/telemetry/ | Outbound business-event emitter port + slog | ADR-0001 |
 
 External runtime (no infra code in-repo; adapters live in internal/bus & internal/store): NATS JetStream server (ADR-0004), PostgreSQL engine (ADR-0005) — SQLite is embedded in-process.
