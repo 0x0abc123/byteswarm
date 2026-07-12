@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/0x0abc123/byteswarm/internal/plugin"
 )
@@ -23,6 +24,24 @@ func (s socketConfig) parseMode() (os.FileMode, error) {
 		return 0, err
 	}
 	return os.FileMode(m), nil
+}
+
+// pluginTimeout parses the optional per-invocation script timeout override. It
+// returns set=false when unset (empty) so the caller can leave the host's
+// built-in default in place, and fails closed on a malformed or non-positive
+// value — a script must always run under a positive wall-clock bound (ADR-0008).
+func (c appConfig) pluginTimeout() (d time.Duration, set bool, err error) {
+	if c.PluginTimeout == "" {
+		return 0, false, nil
+	}
+	d, err = time.ParseDuration(c.PluginTimeout)
+	if err != nil {
+		return 0, false, err
+	}
+	if d <= 0 {
+		return 0, false, fmt.Errorf("must be positive")
+	}
+	return d, true, nil
 }
 
 // storeConfig selects the state store. Only "sqlite" is supported today; the
@@ -56,6 +75,12 @@ type appConfig struct {
 	PluginsDir string                `json:"pluginsDir"`
 	ExecAllow  map[string][]string   `json:"execAllow"`
 	Plugins    []plugin.PluginConfig `json:"plugins"`
+
+	// PluginTimeout overrides the per-invocation script wall-clock bound
+	// (ADR-0008). It is a Go duration string ("5s", "500ms"); empty leaves the
+	// host's built-in default in place. A malformed or non-positive value is a
+	// config error (fail closed) — a plugin must always run under a bound.
+	PluginTimeout string `json:"pluginTimeout,omitempty"`
 
 	// WebhookSecret is the shared secret authenticating POST /webhook. It is a
 	// secret, so it comes ONLY from the environment (BYTESWARM_WEBHOOK_SECRET),
@@ -139,6 +164,9 @@ func applyConfigEnvOverrides(c *appConfig) {
 	if v := os.Getenv("BYTESWARM_PLUGINS_DIR"); v != "" {
 		c.PluginsDir = v
 	}
+	if v := os.Getenv("BYTESWARM_PLUGIN_TIMEOUT"); v != "" {
+		c.PluginTimeout = v
+	}
 	if v := os.Getenv("BYTESWARM_WEBHOOK_SECRET"); v != "" {
 		c.WebhookSecret = v
 	}
@@ -156,6 +184,9 @@ func validateConfig(c appConfig) error {
 	}
 	if err := (plugin.Config{Plugins: c.Plugins}).Validate(); err != nil {
 		return fmt.Errorf("config: invalid plugin declarations: %w", err)
+	}
+	if _, _, err := c.pluginTimeout(); err != nil {
+		return fmt.Errorf("config: invalid pluginTimeout %q (want a positive Go duration, e.g. \"5s\"): %w", c.PluginTimeout, err)
 	}
 	return nil
 }

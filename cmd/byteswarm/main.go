@@ -78,6 +78,10 @@ func main() {
 			defer func() { _ = repo.Close() }()
 
 			host := plugin.NewHost(repo, b, plugin.ExecAllowlist(cfg.ExecAllow), cfg.PluginsDir, logger)
+			if d, set, _ := cfg.pluginTimeout(); set {
+				// Validated in loadConfig; override the host default before loading.
+				host.Timeout = d
+			}
 			n, err := registerPlugins(reg, host, plugin.Config{Plugins: cfg.Plugins})
 			if err != nil {
 				logger.Error("loading script plugins", slog.String("error", err.Error()))
