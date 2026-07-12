@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"sort"
 )
 
 // ErrCommandDenied is returned when a script asks to run a command whose
@@ -58,6 +59,19 @@ func NewExecCapability(allow ExecAllowlist) *ExecCapability {
 func (c *ExecCapability) Allowed(name string) bool {
 	_, ok := c.allow[name]
 	return ok
+}
+
+// AllowedCommands returns the logical command names the plugin may exec, sorted
+// for a stable order. It exposes only the names a script passes to host.exec —
+// never the argv templates, which would leak host binary paths and fixed
+// arguments without giving the script anything it can act on.
+func (c *ExecCapability) AllowedCommands() []string {
+	names := make([]string, 0, len(c.allow))
+	for name := range c.allow {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 // Run resolves name against the allowlist (deny-by-default) and executes the

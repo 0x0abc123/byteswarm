@@ -21,6 +21,26 @@ func TestExecDenyByDefault(t *testing.T) {
 	}
 }
 
+func TestExecAllowedCommands(t *testing.T) {
+	cap := NewExecCapability(ExecAllowlist{"gzip": {"/usr/bin/gzip"}, "backup": {"/usr/bin/tar", "czf"}})
+	got := cap.AllowedCommands()
+	want := []string{"backup", "gzip"} // sorted logical names, no argv templates
+	if len(got) != len(want) {
+		t.Fatalf("AllowedCommands() = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("AllowedCommands() = %v, want %v (sorted)", got, want)
+		}
+	}
+	// The names must not leak the host binary paths from the argv templates.
+	for _, n := range got {
+		if strings.Contains(n, "/") {
+			t.Fatalf("AllowedCommands() leaked a path in %q; want logical names only", n)
+		}
+	}
+}
+
 // fakeRepo records the last key it saw so namespacing can be asserted.
 type fakeRepo struct{ lastKey string }
 

@@ -105,6 +105,35 @@ func TestHandleExposesPluginHome(t *testing.T) {
 	}
 }
 
+func TestHandleExposesPluginMetadata(t *testing.T) {
+	repo := &fakeRepo{}
+	pub := &fakePublisher{}
+	h := testHost(repo, pub, t.TempDir()) // allowlist: {"backup": ...}
+
+	// A script can read its own name and exec allowlist via host.plugin.
+	sc, err := h.Load(PluginConfig{
+		Name:   "greet",
+		Events: []string{"x"},
+		Script: `host.publish("meta", event.workflowID, {name: host.plugin.name, allow: host.plugin.allowlist});`,
+	})
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if err := sc.Handle(context.Background(), event.Event{Type: "x", WorkflowID: "wf1"}); err != nil {
+		t.Fatalf("Handle returned error: %v", err)
+	}
+	if len(pub.got) != 1 {
+		t.Fatalf("published %d events, want 1", len(pub.got))
+	}
+	payload := string(pub.got[0].Payload)
+	if !strings.Contains(payload, `"greet"`) {
+		t.Fatalf("metadata payload = %s, want it to contain the plugin name %q", payload, "greet")
+	}
+	if !strings.Contains(payload, `"backup"`) {
+		t.Fatalf("metadata payload = %s, want it to contain the allowlisted command %q", payload, "backup")
+	}
+}
+
 func TestHandleTimeoutInterruptsRunawayScript(t *testing.T) {
 	h := testHost(&fakeRepo{}, &fakePublisher{}, t.TempDir())
 	h.Timeout = 100 * time.Millisecond
