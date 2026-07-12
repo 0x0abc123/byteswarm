@@ -153,7 +153,7 @@ correctness gap and leads; F4.4 may expose a subject-scheme constraint (below).
   > - Out of scope: replay-from-arbitrary-point (F4.3), multi-cluster.
   > - Acceptance: integration test with the embedded NATS server — publish, re-`Subscribe` with the same durable, and confirm an unacked event is redelivered; a reconnect after a blip does not drop the durable. (Embedded-server-gated like the existing bus test.)
 
-- [ ] **F4.3 Event replay / audit read** · internal/bus · size M · depends on: F4.1
+- [x] **F4.3 Event replay / audit read** · internal/bus · size M · depends on: F4.1
   > /implement-feature read historical events back from the stream for audit/replay.
   > - Component: internal/bus (a replay read primitive; a CLI surface can be a follow-up).
   > - Behavior: add `Replay(ctx, from, handle)` creating an ephemeral JetStream consumer with `DeliverByStartTime`/`DeliverByStartSequence` that streams historical events to `handle` without disturbing live durable consumers. Bounded, read-only (no republish).

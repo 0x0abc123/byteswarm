@@ -89,13 +89,17 @@ func main() {
 		}
 
 		go func() {
-			if err := reg.Run(ctx, b); err != nil {
+			if err := reg.Run(ctx, b, cfg.WorkflowID); err != nil {
 				logger.Error("consumer registry stopped", slog.String("error", err.Error()))
 				stop()
 			}
 		}()
+		scope := cfg.WorkflowID
+		if scope == "" {
+			scope = "any"
+		}
 		logger.Info("event bus connected; consumer registry running",
-			slog.String("nats_url", cfg.NATSURL))
+			slog.String("nats_url", cfg.NATSURL), slog.String("workflow_scope", scope))
 	} else {
 		logger.Warn("no NATS URL configured: running without event bus; POST /events will fail until configured")
 	}

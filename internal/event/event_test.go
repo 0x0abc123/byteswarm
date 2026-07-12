@@ -12,6 +12,23 @@ func TestEventZeroValue(t *testing.T) {
 	}
 }
 
+func TestSubjectsForWorkflow(t *testing.T) {
+	if got := SubjectsForWorkflow(""); len(got) != 1 || got[0] != SubjectAll {
+		t.Fatalf("SubjectsForWorkflow(\"\") = %v, want [%q]", got, SubjectAll)
+	}
+
+	got := SubjectsForWorkflow("wfA")
+	want := []string{"bw.evt.*.wfA", "bw.evt.@broadcast.>"}
+	if len(got) != len(want) {
+		t.Fatalf("SubjectsForWorkflow(wfA) = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("SubjectsForWorkflow(wfA)[%d] = %q, want %q", i, got[i], want[i])
+		}
+	}
+}
+
 func TestValidType(t *testing.T) {
 	valid := []string{
 		"demo",

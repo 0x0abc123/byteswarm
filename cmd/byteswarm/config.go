@@ -22,6 +22,7 @@ type storeConfig struct {
 type appConfig struct {
 	HTTPAddr   string                `json:"httpAddr"`
 	NATSURL    string                `json:"natsURL"`
+	WorkflowID string                `json:"workflowID"` // scope this instance to one workflowID; empty = any (ADR-0004, F4.4)
 	Store      storeConfig           `json:"store"`
 	PluginsDir string                `json:"pluginsDir"`
 	ExecAllow  map[string][]string   `json:"execAllow"`
@@ -84,6 +85,9 @@ func applyConfigEnvOverrides(c *appConfig) {
 	}
 	if v := os.Getenv("BYTESWARM_NATS_URL"); v != "" {
 		c.NATSURL = v
+	}
+	if v := os.Getenv("BYTESWARM_WORKFLOW_ID"); v != "" {
+		c.WorkflowID = v
 	}
 	if v := os.Getenv("BYTESWARM_STORE_PATH"); v != "" {
 		c.Store.Path = v
