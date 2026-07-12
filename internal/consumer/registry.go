@@ -21,9 +21,9 @@ const BroadcastType = event.BroadcastType
 // router between the bus (event.Bus port) and the Consumer port; both native
 // Go consumers and script consumers register here.
 //
-// Routing is in-process by the event's Type: Run takes one broad subscription
-// (event.SubjectAll) and fans out. Broker-side / workflowID-scoped
-// subscriptions are F4.4.
+// Routing is in-process by the event's Type: Run subscribes to the scope's
+// subject(s) (any-workflow = event.SubjectAll; a specific workflowID =
+// broker-side bw.evt.*.<workflowID> plus broadcasts) and fans out to consumers.
 type Registry struct {
 	log *slog.Logger
 
@@ -70,12 +70,14 @@ func (r *Registry) RegisterSubscriber(s Subscriber) {
 // event is redelivered; consumers must be idempotent (a redelivered event
 // re-runs the type's consumers — a stated non-functional in the brief). The
 // bus bounds redelivery so a permanently-failing event cannot loop forever.
-func (r *Registry) Run(ctx context.Context, bus event.Bus) error {
-	err := bus.Subscribe(ctx, event.SubjectAll, func(hctx context.Context, e event.Event) error {
+func (r *Registry) Run(ctx context.Context, bus event.Bus, workflowID string) error {
+	handle := func(hctx context.Context, e event.Event) error {
 		return r.dispatch(hctx, e)
-	})
-	if err != nil {
-		return fmt.Errorf("consumer: subscribing registry: %w", err)
+	}
+	for _, subject := range event.SubjectsForWorkflow(workflowID) {
+		if err := bus.Subscribe(ctx, subject, handle); err != nil {
+			return fmt.Errorf("consumer: subscribing %q: %w", subject, err)
+		}
 	}
 	<-ctx.Done()
 	return nil

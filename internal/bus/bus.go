@@ -316,6 +316,6 @@ func checkToken(s string) error {
 // durableName derives a stable, subject-safe durable consumer name (NATS
 // durable names may not contain '.', '*', '>', or whitespace).
 func durableName(subject string) string {
-	repl := strings.NewReplacer(".", "_", "*", "all", ">", "gt")
+	repl := strings.NewReplacer(".", "_", "*", "all", ">", "gt", "@", "at")
 	return "bw_" + repl.Replace(subject)
 }

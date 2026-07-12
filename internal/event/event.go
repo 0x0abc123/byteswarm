@@ -29,6 +29,25 @@ const (
 	maxTypeLen = 128
 )
 
+// SubjectsForWorkflow returns the bus subscription subject(s) for an instance
+// scoped to workflowID (ADR-0004: "each instance subscribes to a single
+// workflowID or to any"). An empty workflowID means "any" — a single
+// SubjectAll subscription that receives everything, broadcasts included.
+//
+// A scoped instance needs TWO subscriptions: its workflow's events
+// (bw.evt.*.<workflowID> — the '*' pins the single-token type, ADR-0010) AND
+// systemwide broadcasts (bw.evt.<BroadcastType>.>), which are workflow-agnostic
+// and would otherwise be missed by a workflow-scoped subscription.
+func SubjectsForWorkflow(workflowID string) []string {
+	if workflowID == "" {
+		return []string{SubjectAll}
+	}
+	return []string{
+		SubjectPrefix + ".*." + workflowID,
+		SubjectPrefix + "." + BroadcastType + ".>",
+	}
+}
+
 // ValidType reports whether t is a legal event type (ADR-0010): a single
 // subject token — non-empty, at most maxTypeLen, charset [A-Za-z0-9_-] with no
 // dots/whitespace/NATS-wildcards — or the reserved BroadcastType sentinel. A

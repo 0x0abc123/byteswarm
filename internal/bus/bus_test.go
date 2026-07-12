@@ -343,3 +343,50 @@ func awaitEventType(t *testing.T, ch chan event.Event, wantType string) {
 		t.Fatalf("timed out waiting for event %q", wantType)
 	}
 }
+
+func TestScopedSubscriptionFiltersByWorkflow(t *testing.T) {
+	b, err := New(Config{URL: startJetStreamServer(t), Stream: "BYTESWARM_SCOPE"}, testLogger())
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	t.Cleanup(func() { _ = b.Close() })
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	got := make(chan event.Event, 8)
+	// Scope to wfA via broker-side subject filtering (single-token type,
+	// ADR-0010, makes the '*' pin the workflowID token).
+	err = b.Subscribe(ctx, "bw.evt.*.wfA", func(_ context.Context, e event.Event) error {
+		select {
+		case got <- e:
+		default:
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Subscribe: %v", err)
+	}
+
+	if err := b.Publish(ctx, event.Event{Type: "task", WorkflowID: "wfB"}); err != nil {
+		t.Fatalf("publish wfB: %v", err)
+	}
+	if err := b.Publish(ctx, event.Event{Type: "task", WorkflowID: "wfA"}); err != nil {
+		t.Fatalf("publish wfA: %v", err)
+	}
+
+	select {
+	case e := <-got:
+		if e.WorkflowID != "wfA" {
+			t.Fatalf("scoped instance received workflow %q, want wfA (broker-side filter leaked)", e.WorkflowID)
+		}
+	case <-time.After(8 * time.Second):
+		t.Fatal("scoped instance did not receive its own workflow's event")
+	}
+	// wfB's event must not arrive.
+	select {
+	case e := <-got:
+		t.Fatalf("scoped instance unexpectedly received a non-scoped event: %+v", e)
+	case <-time.After(500 * time.Millisecond):
+	}
+}

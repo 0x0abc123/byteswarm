@@ -45,19 +45,28 @@ func (c *errorConsumer) Handle(context.Context, event.Event) error {
 
 // fakeBus captures the subscription so a test can drive deliveries directly.
 type fakeBus struct {
-	subject    string
+	mu         sync.Mutex
+	subjects   []string
 	handler    func(context.Context, event.Event) error
 	subscribed chan struct{}
 }
 
-func newFakeBus() *fakeBus { return &fakeBus{subscribed: make(chan struct{}, 1)} }
+func newFakeBus() *fakeBus { return &fakeBus{subscribed: make(chan struct{}, 8)} }
 
 func (b *fakeBus) Publish(context.Context, event.Event) error { return nil }
 func (b *fakeBus) Subscribe(_ context.Context, subject string, handle func(context.Context, event.Event) error) error {
-	b.subject = subject
+	b.mu.Lock()
+	b.subjects = append(b.subjects, subject)
 	b.handler = handle
+	b.mu.Unlock()
 	b.subscribed <- struct{}{}
 	return nil
+}
+
+func (b *fakeBus) subjectList() []string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return append([]string(nil), b.subjects...)
 }
 
 func TestDispatchRoutesByType(t *testing.T) {
@@ -156,7 +165,7 @@ func TestRunHandlerReportsFailureForRedelivery(t *testing.T) {
 	fb := newFakeBus()
 	ctx, cancel := context.WithCancel(context.Background())
 	runErr := make(chan error, 1)
-	go func() { runErr <- r.Run(ctx, fb) }()
+	go func() { runErr <- r.Run(ctx, fb, "") }()
 
 	<-fb.subscribed
 	if err := fb.handler(ctx, event.Event{Type: "type.a"}); err == nil {
@@ -171,6 +180,29 @@ func TestRunHandlerReportsFailureForRedelivery(t *testing.T) {
 	}
 }
 
+func TestRunScopedSubscribesToWorkflowAndBroadcast(t *testing.T) {
+	r := NewRegistry(testLogger())
+	fb := newFakeBus()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go func() { _ = r.Run(ctx, fb, "wfA") }()
+
+	// A scoped instance makes two subscriptions: its workflow + broadcasts.
+	<-fb.subscribed
+	<-fb.subscribed
+	subs := fb.subjectList()
+	if len(subs) != 2 {
+		t.Fatalf("scoped instance subscribed to %v, want 2 subjects", subs)
+	}
+	want := map[string]bool{"bw.evt.*.wfA": true, "bw.evt.@broadcast.>": true}
+	for _, s := range subs {
+		if !want[s] {
+			t.Fatalf("unexpected scoped subject %q; got %v", s, subs)
+		}
+	}
+}
+
 func TestRunSubscribesToAllAndDispatches(t *testing.T) {
 	rec := &recordingConsumer{}
 	r := NewRegistry(testLogger())
@@ -179,11 +211,11 @@ func TestRunSubscribesToAllAndDispatches(t *testing.T) {
 	fb := newFakeBus()
 	ctx, cancel := context.WithCancel(context.Background())
 	runErr := make(chan error, 1)
-	go func() { runErr <- r.Run(ctx, fb) }()
+	go func() { runErr <- r.Run(ctx, fb, "") }()
 
 	<-fb.subscribed
-	if fb.subject != event.SubjectAll {
-		t.Fatalf("subscribed subject = %q, want %q", fb.subject, event.SubjectAll)
+	if subs := fb.subjectList(); len(subs) != 1 || subs[0] != event.SubjectAll {
+		t.Fatalf("any-scope subscribed to %v, want [%q]", subs, event.SubjectAll)
 	}
 
 	if err := fb.handler(ctx, event.Event{Type: "type.a"}); err != nil {
