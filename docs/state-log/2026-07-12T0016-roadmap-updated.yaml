@@ -1,0 +1,10 @@
+event: roadmap-updated
+timestamp: 2026-07-12T00:16:07Z
+actor: 0x0abc123
+stage: null
+summary: Roadmap refreshed after M4 delivery (F4.1-F4.4 merged). M5 (observability, final milestone) elaborated — F5.1 slog-backed business-event emitter adapter behind the existing telemetry.Emitter port (dep corrected to none), F5.2 HTTP panic-recovery + structured error logging re-homed from internal/telemetry to internal/server. Noted that structured logging is already pervasive. Captured deferred follow-ups: expose Emit to consumers/plugins, CLI replay command, dead-letter handling.
+refs:
+  adr: ["0006"]
+  commit: null
+  files:
+    - docs/roadmap.md
