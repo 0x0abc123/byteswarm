@@ -33,6 +33,20 @@ func NewSandboxedFS(base string) *SandboxedFS {
 	return &SandboxedFS{base: filepath.Clean(base)}
 }
 
+// Home returns the absolute path of the plugin's sandbox directory — its
+// filesystem "home" (ADR-0008). Scripts read it via host.fs.home() to build
+// absolute paths for allowlisted exec calls that act on files they wrote
+// through the fs capability. It confers no new authority and does not weaken
+// the sandbox: fs.read/fs.write still reject absolute paths (Resolve), so
+// knowing the home cannot be turned into an escape; it only discloses the host
+// directory layout to the (already semi-trusted) plugin author.
+func (f *SandboxedFS) Home() string {
+	if abs, err := filepath.Abs(f.base); err == nil {
+		return abs
+	}
+	return f.base
+}
+
 // Resolve maps a script-supplied relative path to a real path inside the
 // sandbox, or returns ErrPathEscape. This lexical guard rejects absolute paths
 // and any ".." that climbs above base. Symlink-escape resolution is enforced

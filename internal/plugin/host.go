@@ -237,6 +237,13 @@ func (c *ScriptConsumer) inject(ctx context.Context, rt *goja.Runtime, e event.E
 			"write": func(path, data string) error {
 				return c.caps.FS.WriteFile(path, []byte(data))
 			},
+			// home() returns the plugin's absolute sandbox directory so a script
+			// can name files it wrote (relative) as absolute paths for exec. It
+			// grants no new authority — fs.read/fs.write still reject absolute
+			// paths, so home cannot be used to escape the sandbox.
+			"home": func() string {
+				return c.caps.FS.Home()
+			},
 		},
 		"publish": func(typ, workflowID string, payload interface{}) error {
 			var pb []byte
