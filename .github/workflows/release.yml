@@ -1,0 +1,109 @@
+# Release workflow — hand-authored, NOT skill-generated (generate-cicd owns only
+# verify/package/deploy, so it will not clobber this file). On a v* tag it builds
+# static byteswarm + byteswarmctl binaries for the supported platforms, archives
+# and checksums them, and publishes a GitHub Release.
+#
+# ADR-0006: the artifact is static Go binaries. CGO_ENABLED=0 is valid because
+# both DB drivers are pure Go (modernc.org/sqlite, jackc/pgx), so the build
+# cross-compiles without a C toolchain. Third-party actions are pinned to commit
+# SHAs (reference/security-fundamentals.md: pin dependency versions).
+#
+# Targets are Unix-only: the server binds the operator-local /events Unix domain
+# socket (ADR-0011, syscall.Umask) and does not build for Windows, so the product
+# is not shipped there.
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+# Least privilege: the default token is read-only; only the publish job is
+# granted contents:write to create the Release. Tags trigger this; nothing here
+# writes to a branch, so branch protection is not involved.
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build ${{ matrix.goos }}/${{ matrix.goarch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false # build every target so a single failure is fully diagnosable
+      matrix:
+        include:
+          - { goos: linux, goarch: amd64 }
+          - { goos: linux, goarch: arm64 }
+          - { goos: darwin, goarch: arm64 }
+          - { goos: darwin, goarch: amd64 }
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version-file: go.mod
+      - name: build static binaries
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+          VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          for cmd in byteswarm byteswarmctl; do
+            # -trimpath for reproducibility; -s -w strip debug info; -X stamps the
+            # tag into main.version of each binary.
+            go build -trimpath \
+              -ldflags "-s -w -X main.version=${VERSION}" \
+              -o "build/${cmd}" "./cmd/${cmd}"
+          done
+      - name: archive
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          base="byteswarm_${VERSION}_${GOOS}_${GOARCH}"
+          mkdir -p out
+          tar -C build -czf "out/${base}.tar.gz" .
+      - name: upload build artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: out/*
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: publish release
+    needs: build # gate: runs only if every target built, so no partial release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the Release and upload assets
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: staging
+          merge-multiple: true # flatten every build artifact into staging/
+      - name: checksums
+        working-directory: staging
+        run: |
+          set -euo pipefail
+          sha256sum byteswarm_* > SHA256SUMS
+          cat SHA256SUMS
+      - name: publish release
+        working-directory: staging
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          # A semver pre-release tag (contains a hyphen, e.g. v1.2.0-rc.1) is
+          # published as a GitHub pre-release.
+          flags=(--title "$VERSION" --generate-notes)
+          [[ "$VERSION" == *-* ]] && flags+=(--prerelease)
+          gh release create "$VERSION" \
+            --repo "$GITHUB_REPOSITORY" \
+            "${flags[@]}" \
+            byteswarm_* SHA256SUMS

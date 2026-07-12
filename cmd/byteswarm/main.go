@@ -30,6 +30,10 @@ import (
 	"github.com/0x0abc123/byteswarm/internal/store"
 )
 
+// version is the server build version, overridable at link time via -ldflags
+// (-X main.version=...); it defaults to a dev sentinel for local builds.
+var version = "0.0.0-dev"
+
 // noBusPublisher is the Publisher used when no event bus is configured
 // (BYTESWARM_NATS_URL unset): POST /events fails closed rather than dropping
 // events silently. Set BYTESWARM_NATS_URL to enable publishing.
@@ -41,6 +45,7 @@ func (noBusPublisher) Publish(context.Context, event.Event) error {
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	logger.Info("starting byteswarm", slog.String("version", version))
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
