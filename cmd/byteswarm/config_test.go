@@ -29,6 +29,9 @@ func TestLoadConfigDefaults(t *testing.T) {
 	if cfg.PluginsDir != "plugins" {
 		t.Errorf("PluginsDir = %q, want plugins", cfg.PluginsDir)
 	}
+	if cfg.Socket.Path != "byteswarm-events.sock" || cfg.Socket.Mode != "0660" {
+		t.Errorf("Socket = %+v, want byteswarm-events.sock / 0660", cfg.Socket)
+	}
 }
 
 func TestLoadConfigParsesFile(t *testing.T) {
@@ -64,6 +67,8 @@ func TestLoadConfigEnvOverridesFile(t *testing.T) {
 	t.Setenv("BYTESWARM_HTTP_ADDR", ":7000")
 	t.Setenv("BYTESWARM_NATS_URL", "nats://env:4222")
 	t.Setenv("BYTESWARM_STORE_PATH", "env.db")
+	t.Setenv("BYTESWARM_EVENTS_SOCKET", "/run/byteswarm/events.sock")
+	t.Setenv("BYTESWARM_EVENTS_SOCKET_GROUP", "byteswarm")
 
 	cfg, err := loadConfig(path)
 	if err != nil {
@@ -71,6 +76,9 @@ func TestLoadConfigEnvOverridesFile(t *testing.T) {
 	}
 	if cfg.HTTPAddr != ":7000" {
 		t.Errorf("HTTPAddr = %q, want env override :7000", cfg.HTTPAddr)
+	}
+	if cfg.Socket.Path != "/run/byteswarm/events.sock" || cfg.Socket.Group != "byteswarm" {
+		t.Errorf("Socket env override = %+v", cfg.Socket)
 	}
 	if cfg.NATSURL != "nats://env:4222" {
 		t.Errorf("NATSURL = %q, want env override", cfg.NATSURL)
@@ -85,6 +93,7 @@ func TestLoadConfigFailsClosed(t *testing.T) {
 		"malformed json":               `{"httpAddr":`,
 		"unknown field":                `{"nope": 1}`,
 		"unsupported store driver":     `{"store": {"driver": "postgres"}}`,
+		"invalid socket mode":          `{"socket": {"mode": "99z"}}`,
 		"invalid plugin (no events)":   `{"plugins": [{"name": "x", "script": "1"}]}`,
 		"invalid plugin (two sources)": `{"plugins": [{"name": "x", "events": ["e"], "path": "p.js", "script": "1"}]}`,
 	}

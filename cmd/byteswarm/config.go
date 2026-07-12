@@ -4,9 +4,26 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/0x0abc123/byteswarm/internal/plugin"
 )
+
+// defaultSocketPath is the operator-local /events Unix socket (ADR-0011),
+// relative to the working directory to match the store's default (byteswarm.db);
+// production deployments set an absolute path via config/env. byteswarmctl
+// defaults to the same path.
+const defaultSocketPath = "byteswarm-events.sock"
+
+// parseMode parses the octal socket mode string (e.g. "0660"). It fails closed:
+// a malformed mode is a config error, not a silent default.
+func (s socketConfig) parseMode() (os.FileMode, error) {
+	m, err := strconv.ParseUint(s.Mode, 8, 32)
+	if err != nil {
+		return 0, err
+	}
+	return os.FileMode(m), nil
+}
 
 // storeConfig selects the state store. Only "sqlite" is supported today; the
 // PostgreSQL adapter is roadmap F2.2. Path is the SQLite database file.
@@ -15,12 +32,24 @@ type storeConfig struct {
 	Path   string `json:"path"`
 }
 
+// socketConfig configures the operator-local /events Unix domain socket
+// (ADR-0011). The socket's file permissions are the access control, so Mode and
+// Group are security-relevant: keep the socket owned by the operator group at
+// mode 0660 (or tighter). Mode is an octal string ("0660"); Group is a group
+// name resolved at bind time (empty → leave the socket's default group).
+type socketConfig struct {
+	Path  string `json:"path"`
+	Mode  string `json:"mode"`
+	Group string `json:"group"`
+}
+
 // appConfig is byteswarm's committable configuration (ADR-0006). The JSON file
 // is the reviewable base; environment variables override the scalar fields per
 // deployment. Secrets never belong in the committed file — pass them via env
 // (reference/security-fundamentals.md).
 type appConfig struct {
 	HTTPAddr   string                `json:"httpAddr"`
+	Socket     socketConfig          `json:"socket"` // operator-local /events Unix socket (ADR-0011)
 	NATSURL    string                `json:"natsURL"`
 	WorkflowID string                `json:"workflowID"` // scope this instance to one workflowID; empty = any (ADR-0004, F4.4)
 	Store      storeConfig           `json:"store"`
@@ -65,6 +94,12 @@ func applyConfigDefaults(c *appConfig) {
 	if c.HTTPAddr == "" {
 		c.HTTPAddr = ":8080"
 	}
+	if c.Socket.Path == "" {
+		c.Socket.Path = defaultSocketPath
+	}
+	if c.Socket.Mode == "" {
+		c.Socket.Mode = "0660"
+	}
 	if c.Store.Driver == "" {
 		c.Store.Driver = "sqlite"
 	}
@@ -82,6 +117,15 @@ func applyConfigDefaults(c *appConfig) {
 func applyConfigEnvOverrides(c *appConfig) {
 	if v := os.Getenv("BYTESWARM_HTTP_ADDR"); v != "" {
 		c.HTTPAddr = v
+	}
+	if v := os.Getenv("BYTESWARM_EVENTS_SOCKET"); v != "" {
+		c.Socket.Path = v
+	}
+	if v := os.Getenv("BYTESWARM_EVENTS_SOCKET_MODE"); v != "" {
+		c.Socket.Mode = v
+	}
+	if v := os.Getenv("BYTESWARM_EVENTS_SOCKET_GROUP"); v != "" {
+		c.Socket.Group = v
 	}
 	if v := os.Getenv("BYTESWARM_NATS_URL"); v != "" {
 		c.NATSURL = v
@@ -103,6 +147,12 @@ func applyConfigEnvOverrides(c *appConfig) {
 func validateConfig(c appConfig) error {
 	if c.Store.Driver != "sqlite" {
 		return fmt.Errorf("config: unsupported store driver %q (only \"sqlite\" is available; PostgreSQL is roadmap F2.2)", c.Store.Driver)
+	}
+	if c.Socket.Path == "" {
+		return fmt.Errorf("config: socket path must not be empty (ADR-0011: /events is served over a Unix socket)")
+	}
+	if _, err := c.Socket.parseMode(); err != nil {
+		return fmt.Errorf("config: invalid socket mode %q (want octal, e.g. \"0660\"): %w", c.Socket.Mode, err)
 	}
 	if err := (plugin.Config{Plugins: c.Plugins}).Validate(); err != nil {
 		return fmt.Errorf("config: invalid plugin declarations: %w", err)

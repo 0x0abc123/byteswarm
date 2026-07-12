@@ -112,18 +112,41 @@ func main() {
 		logger.Warn("BYTESWARM_WEBHOOK_SECRET not set: POST /webhook will reject all requests until configured")
 	}
 
-	srv := &http.Server{
-		Addr:    cfg.HTTPAddr,
-		Handler: server.New(logger, pub, webhookAuth),
-		// Bound the request read to defend against slow-client attacks
-		// (reference/security-fundamentals.md: request timeouts on every server).
+	handlers := server.New(logger, pub, webhookAuth)
+
+	// Split ingress by transport (ADR-0011). Both bound with a read-header
+	// timeout to defend against slow-client attacks
+	// (reference/security-fundamentals.md: request timeouts on every server).
+	//
+	// /events: operator-local, over a Unix domain socket whose file permissions
+	// are the access control (defence in depth, no app-layer auth).
+	eventsLn, err := listenUnix(cfg.Socket)
+	if err != nil {
+		logger.Error("binding events socket", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+	eventsSrv := &http.Server{
+		Handler:           handlers.Events,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+	// /webhook + health: over TCP for authenticated, cross-host, untrusted callers.
+	controlSrv := &http.Server{
+		Addr:              cfg.HTTPAddr,
+		Handler:           handlers.Control,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	go func() {
-		logger.Info("byteswarm server listening", slog.String("addr", cfg.HTTPAddr))
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logger.Error("server error", slog.String("error", err.Error()))
+		logger.Info("byteswarm events ingress listening", slog.String("socket", cfg.Socket.Path))
+		if err := eventsSrv.Serve(eventsLn); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Error("events ingress error", slog.String("error", err.Error()))
+			stop()
+		}
+	}()
+	go func() {
+		logger.Info("byteswarm control ingress listening", slog.String("addr", cfg.HTTPAddr))
+		if err := controlSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Error("control ingress error", slog.String("error", err.Error()))
 			stop()
 		}
 	}()
@@ -133,8 +156,16 @@ func main() {
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if err := srv.Shutdown(shutdownCtx); err != nil {
-		logger.Error("graceful shutdown failed", slog.String("error", err.Error()))
+	// Shut down both ingresses; the Unix listener unlinks its socket on close.
+	var shutdownErr error
+	if err := eventsSrv.Shutdown(shutdownCtx); err != nil {
+		shutdownErr = errors.Join(shutdownErr, err)
+	}
+	if err := controlSrv.Shutdown(shutdownCtx); err != nil {
+		shutdownErr = errors.Join(shutdownErr, err)
+	}
+	if shutdownErr != nil {
+		logger.Error("graceful shutdown failed", slog.String("error", shutdownErr.Error()))
 		os.Exit(1)
 	}
 	logger.Info("shutdown complete")

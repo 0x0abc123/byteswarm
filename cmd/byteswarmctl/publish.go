@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -29,7 +30,7 @@ func publishCmd(args []string, out io.Writer) error {
 		typ      = fs.String("type", "", "event type (required)")
 		workflow = fs.String("workflow", "", "workflowID (optional)")
 		payload  = fs.String("payload", "", "event payload as JSON (optional)")
-		addr     = fs.String("addr", defaultAddr(), "byteswarm server base URL")
+		socket   = fs.String("socket", defaultSocketPath(), "path to the byteswarm /events Unix domain socket")
 	)
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -46,18 +47,23 @@ func publishCmd(args []string, out io.Writer) error {
 		body.Payload = json.RawMessage(*payload)
 	}
 
-	return doPublish(context.Background(), http.DefaultClient, normalizeAddr(*addr), body, out)
+	return doPublish(context.Background(), socketClient(*socket), body, out)
 }
 
-// doPublish POSTs the event to <addr>/events and reports the outcome. It is the
-// testable core: the caller injects the HTTP client and base URL.
-func doPublish(ctx context.Context, client *http.Client, addr string, body publishBody, out io.Writer) error {
+// eventsURL is the request URL for the /events ingress. The host is a fixed
+// placeholder: the socket-dialing transport ignores it and connects to the
+// configured Unix socket path (ADR-0011).
+const eventsURL = "http://unix/events"
+
+// doPublish POSTs the event to the /events ingress and reports the outcome. It
+// is the testable core: the caller injects the HTTP client (which carries the
+// socket-dialing transport).
+func doPublish(ctx context.Context, client *http.Client, body publishBody, out io.Writer) error {
 	data, err := json.Marshal(body)
 	if err != nil {
 		return fmt.Errorf("publish: encoding request: %w", err)
 	}
-	url := strings.TrimRight(addr, "/") + "/events"
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(data))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, eventsURL, bytes.NewReader(data))
 	if err != nil {
 		return fmt.Errorf("publish: building request: %w", err)
 	}
@@ -77,25 +83,28 @@ func doPublish(ctx context.Context, client *http.Client, addr string, body publi
 	return nil
 }
 
-// defaultAddr resolves the server base URL from BYTESWARM_HTTP_ADDR, falling
-// back to localhost. The value is normalized (scheme added) by normalizeAddr.
-func defaultAddr() string {
-	if a := os.Getenv("BYTESWARM_HTTP_ADDR"); a != "" {
-		return a
+// defaultSocketPath resolves the /events socket path from BYTESWARM_EVENTS_SOCKET,
+// falling back to a path relative to the working directory that matches the
+// server's default (ADR-0011). Production operators point both at an absolute
+// path via config/env.
+func defaultSocketPath() string {
+	if p := os.Getenv("BYTESWARM_EVENTS_SOCKET"); p != "" {
+		return p
 	}
-	return "http://localhost:8080"
+	return "byteswarm-events.sock"
 }
 
-// normalizeAddr turns a listen-style or bare address into a client base URL, so
-// the same BYTESWARM_HTTP_ADDR value the server binds to (e.g. ":8080") also
-// works as a CLI target.
-func normalizeAddr(a string) string {
-	switch {
-	case strings.Contains(a, "://"):
-		return a
-	case strings.HasPrefix(a, ":"):
-		return "http://localhost" + a
-	default:
-		return "http://" + a
+// socketClient returns an HTTP client whose transport dials the given Unix
+// domain socket regardless of request host — the operator-local /events ingress
+// is not on the network (ADR-0011). The HTTP request/response contract is
+// otherwise unchanged.
+func socketClient(path string) *http.Client {
+	return &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+				var d net.Dialer
+				return d.DialContext(ctx, "unix", path)
+			},
+		},
 	}
 }

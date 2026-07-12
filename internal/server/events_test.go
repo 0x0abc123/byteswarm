@@ -39,7 +39,7 @@ func (p *fakePublisher) count() int {
 }
 
 func testHandler(pub event.Publisher) http.Handler {
-	return New(slog.New(slog.NewJSONHandler(io.Discard, nil)), pub, auth.NewSharedSecret("test-secret"))
+	return New(slog.New(slog.NewJSONHandler(io.Discard, nil)), pub, auth.NewSharedSecret("test-secret")).Events
 }
 
 func TestSubmitEventValid(t *testing.T) {
