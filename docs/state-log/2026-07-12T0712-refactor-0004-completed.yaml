@@ -1,0 +1,15 @@
+event: refactor-0004-completed
+timestamp: 2026-07-12T07:12:53Z
+actor: 0x0abc123
+stage: refactor-0004
+summary: Completed — /events is now served over a Unix domain socket (0660, operator group) with the trust boundary in the OS filesystem/user model; /webhook + health remain on TCP. Adapter-only migration (domain ports untouched); CI green including the full go test -race suite. ADR-0011 supersedes 0002; ADR-0006 deploy targets stand. Merged via PR #36.
+refs:
+  adr: ["0011", "0002", "0006"]
+  commit: null
+  files:
+    - docs/adr/0011-events-unix-domain-socket.md
+    - docs/c4/components/server.mmd
+    - internal/server/server.go
+    - cmd/byteswarm/socket.go
+    - cmd/byteswarmctl/publish.go
+  pr: "https://github.com/0x0abc123/byteswarm/pull/36"
