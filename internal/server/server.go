@@ -14,21 +14,43 @@ import (
 	"github.com/0x0abc123/byteswarm/internal/event"
 )
 
-// New builds the HTTP handler: the health/readiness endpoints, the operator
-// event submit endpoint (/events), the authenticated external-trigger webhook
-// (/webhook), and the standard middleware chain. The Publisher and
-// Authenticator ports are injected (constructor injection, wired at the
-// composition root).
-func New(logger *slog.Logger, pub event.Publisher, webhookAuth auth.Authenticator) http.Handler {
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /healthz", writeStatus("ok"))
-	mux.HandleFunc("GET /readyz", writeStatus("ready"))
-	mux.HandleFunc("POST /events", submitEvent(logger, pub))
-	mux.HandleFunc("POST /webhook", webhook(logger, webhookAuth, pub))
-	// Order (outer→inner): correlationID sets the ID first, then requestLogger,
-	// then recoverer wraps the handlers — so a recovered panic is logged with
-	// the correlation ID already in context.
-	return correlationID(requestLogger(logger)(recoverer(logger)(mux)))
+// Handlers are the two inbound HTTP handlers, each bound to its own transport by
+// the composition root (ADR-0011). Events carries the operator-local POST
+// /events and is served over a Unix domain socket whose file permissions are the
+// access control — it has no application-layer auth. Control carries the
+// authenticated POST /webhook and the health endpoints and is served over TCP
+// for untrusted and cross-host callers. Both funnel into the same
+// bounded/validated acceptEvent path.
+type Handlers struct {
+	Events  http.Handler
+	Control http.Handler
+}
+
+// New builds the two inbound HTTP handlers with the shared middleware chain. The
+// Publisher and Authenticator ports are injected (constructor injection, wired
+// at the composition root). Splitting the routes by handler is what lets the
+// root serve /events on the Unix socket and /webhook + health on TCP.
+func New(logger *slog.Logger, pub event.Publisher, webhookAuth auth.Authenticator) Handlers {
+	events := http.NewServeMux()
+	events.HandleFunc("POST /events", submitEvent(logger, pub))
+
+	control := http.NewServeMux()
+	control.HandleFunc("GET /healthz", writeStatus("ok"))
+	control.HandleFunc("GET /readyz", writeStatus("ready"))
+	control.HandleFunc("POST /webhook", webhook(logger, webhookAuth, pub))
+
+	return Handlers{
+		Events:  withMiddleware(logger, events),
+		Control: withMiddleware(logger, control),
+	}
+}
+
+// withMiddleware wraps a handler in the standard chain. Order (outer→inner):
+// correlationID sets the ID first, then requestLogger, then recoverer wraps the
+// handler — so a recovered panic is logged with the correlation ID already in
+// context.
+func withMiddleware(logger *slog.Logger, h http.Handler) http.Handler {
+	return correlationID(requestLogger(logger)(recoverer(logger)(h)))
 }
 
 // writeStatus returns a handler emitting a small JSON status body.

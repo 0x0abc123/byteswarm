@@ -3,11 +3,28 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"net"
 	"net/http"
-	"net/http/httptest"
+	"path/filepath"
 	"sync/atomic"
 	"testing"
 )
+
+// startSocketServer serves h on a Unix domain socket in a temp dir and returns
+// the socket path — the same transport byteswarmctl uses to reach /events
+// (ADR-0011).
+func startSocketServer(t *testing.T, h http.Handler) string {
+	t.Helper()
+	sock := filepath.Join(t.TempDir(), "e.sock")
+	ln, err := net.Listen("unix", sock)
+	if err != nil {
+		t.Fatalf("listen unix: %v", err)
+	}
+	srv := &http.Server{Handler: h}
+	go func() { _ = srv.Serve(ln) }()
+	t.Cleanup(func() { _ = srv.Close() })
+	return sock
+}
 
 func TestPublishSendsRequest(t *testing.T) {
 	type captured struct {
@@ -15,16 +32,15 @@ func TestPublishSendsRequest(t *testing.T) {
 		body         publishBody
 	}
 	got := make(chan captured, 1)
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	sock := startSocketServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var b publishBody
 		_ = json.NewDecoder(r.Body).Decode(&b)
 		got <- captured{r.Method, r.URL.Path, b}
 		w.WriteHeader(http.StatusAccepted)
 	}))
-	defer ts.Close()
 
 	var out bytes.Buffer
-	err := publishCmd([]string{"--type", "order_created", "--workflow", "wf1", "--payload", `{"id":7}`, "--addr", ts.URL}, &out)
+	err := publishCmd([]string{"--type", "order_created", "--workflow", "wf1", "--payload", `{"id":7}`, "--socket", sock}, &out)
 	if err != nil {
 		t.Fatalf("publishCmd error: %v", err)
 	}
@@ -42,27 +58,25 @@ func TestPublishSendsRequest(t *testing.T) {
 }
 
 func TestPublishNon2xxErrors(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	sock := startSocketServer(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "nope", http.StatusBadRequest)
 	}))
-	defer ts.Close()
 
 	var out bytes.Buffer
-	if err := publishCmd([]string{"--type", "t", "--addr", ts.URL}, &out); err == nil {
+	if err := publishCmd([]string{"--type", "t", "--socket", sock}, &out); err == nil {
 		t.Fatal("publishCmd with a 400 response should return an error")
 	}
 }
 
 func TestPublishInvalidPayloadRejectedBeforeSend(t *testing.T) {
 	var hits atomic.Int64
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	sock := startSocketServer(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		hits.Add(1)
 		w.WriteHeader(http.StatusAccepted)
 	}))
-	defer ts.Close()
 
 	var out bytes.Buffer
-	if err := publishCmd([]string{"--type", "t", "--payload", "{not json", "--addr", ts.URL}, &out); err == nil {
+	if err := publishCmd([]string{"--type", "t", "--payload", "{not json", "--socket", sock}, &out); err == nil {
 		t.Fatal("publishCmd with invalid --payload should return an error")
 	}
 	if hits.Load() != 0 {
@@ -77,16 +91,13 @@ func TestPublishRequiresType(t *testing.T) {
 	}
 }
 
-func TestNormalizeAddr(t *testing.T) {
-	cases := map[string]string{
-		"http://x:8080":  "http://x:8080",
-		"https://x":      "https://x",
-		":8080":          "http://localhost:8080",
-		"localhost:8080": "http://localhost:8080",
+func TestDefaultSocketPath(t *testing.T) {
+	t.Setenv("BYTESWARM_EVENTS_SOCKET", "")
+	if got := defaultSocketPath(); got != "byteswarm-events.sock" {
+		t.Errorf("default = %q, want byteswarm-events.sock", got)
 	}
-	for in, want := range cases {
-		if got := normalizeAddr(in); got != want {
-			t.Errorf("normalizeAddr(%q) = %q, want %q", in, got, want)
-		}
+	t.Setenv("BYTESWARM_EVENTS_SOCKET", "/run/byteswarm/e.sock")
+	if got := defaultSocketPath(); got != "/run/byteswarm/e.sock" {
+		t.Errorf("env override = %q, want /run/byteswarm/e.sock", got)
 	}
 }

@@ -2,12 +2,12 @@
 id: "0002"
 title: "Client approach — CLI primary, webhook ingress"
 date: 2026-07-10
-status: accepted
+status: superseded
 deciders: ["claude (advisor)", "0x0abc123"]
 retrospective: false
 decision_key: client_approach
 supersedes: null
-superseded_by: null
+superseded_by: "0011"
 tags: [client, cli, ingress]
 ---
 

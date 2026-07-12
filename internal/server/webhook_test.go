@@ -13,7 +13,7 @@ import (
 )
 
 func webhookTestHandler(pub event.Publisher, secret string) http.Handler {
-	return New(slog.New(slog.NewJSONHandler(io.Discard, nil)), pub, auth.NewSharedSecret(secret))
+	return New(slog.New(slog.NewJSONHandler(io.Discard, nil)), pub, auth.NewSharedSecret(secret)).Control
 }
 
 func TestWebhookAuthenticatedPublishes(t *testing.T) {

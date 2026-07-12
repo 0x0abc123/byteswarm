@@ -1,0 +1,48 @@
+%% C4 L3 — Component diagram for byteswarm Server
+%% Source of truth: docs/adr/ — regenerate via /generate-component-l3, do not hand-edit
+%% Generated: 2026-07-12
+%% Reflects ADR-0011 (refactor-0004): split ingress — /events over a Unix domain
+%% socket, /webhook + health over TCP. Target design; code migration in progress
+%% on branch refactor/0004-events-uds.
+flowchart TB
+    cli["CLI<br/><i>[container: Go static binary]</i>"]
+    trigger["External trigger source<br/><i>[external system]</i>"]
+    bus["Event Bus<br/><i>[container: NATS JetStream]</i>"]
+
+    subgraph srv [byteswarm Server]
+        root["Composition root<br/><i>[component: cmd/byteswarm]</i>"]
+        udsL["Unix-socket listener — POST /events<br/>operator-local, 0660 socket perms<br/><i>[component]</i>"]
+        tcpL["TCP listener — /webhook, /healthz, /readyz<br/><i>[component]</i>"]
+        mw["Middleware: correlationID &rarr; log &rarr; recover<br/><i>[component]</i>"]
+        evH["submitEvent handler<br/>no app-layer auth<br/><i>[component]</i>"]
+        whH["webhook handler<br/><i>[component]</i>"]
+        hH["health handlers<br/><i>[component]</i>"]
+        accept["acceptEvent — validate &amp; bound<br/><i>[component]</i>"]
+        authPort["auth.Authenticator<br/>(port)<br/><i>[component]</i>"]
+        secret["SharedSecret authenticator<br/><i>[component]</i>"]
+        pubPort["event.Publisher<br/>(port)<br/><i>[component]</i>"]
+    end
+
+    cli -->|"submits events, operator-local (0660) [JSON over Unix socket]"| udsL
+    trigger -->|"fires events (shared-secret auth) [JSON/HTTPS/TCP]"| tcpL
+    root -->|"binds, owns socket lifecycle (unlink/cleanup)"| udsL
+    root -->|"binds"| tcpL
+    udsL -->|"serves"| mw
+    tcpL -->|"serves"| mw
+    mw -->|"POST /events"| evH
+    mw -->|"POST /webhook"| whH
+    mw -->|"GET /healthz, /readyz"| hH
+    whH -->|"authenticates [via Authenticator port]"| authPort
+    authPort -->|"implemented by"| secret
+    evH -->|"accepts"| accept
+    whH -->|"accepts on success"| accept
+    accept -->|"publishes [via Publisher port]"| pubPort
+    pubPort -->|"implemented by bus adapter"| bus
+
+    classDef person    fill:#08427b,stroke:#052e56,color:#ffffff
+    classDef internal  fill:#1168bd,stroke:#0b4884,color:#ffffff
+    classDef external  fill:#999999,stroke:#6b6b6b,color:#ffffff
+    classDef datastore fill:#438dd5,stroke:#2e6295,color:#ffffff
+    classDef component fill:#85bbf0,stroke:#5d82a8,color:#000000
+    class cli,trigger,bus external
+    class root,udsL,tcpL,mw,evH,whH,hH,accept,authPort,secret,pubPort component

@@ -54,8 +54,10 @@ emit further events — composing larger workflows from small, independent steps
   Scale by one any-scope instance or by N disjoint per-`workflowID` instances (not both).
 - Resilience: survive server reboot and external-network loss/reconnect; no critical
   in-process state.
-- Security: single trusted operator; publish/consume unauthenticated; webhook auth is
-  shared-secret now and pluggable for stronger mechanisms later; auth fails closed. Script plugins
+- Security: single trusted operator; the operator-local /events ingress is served over a Unix
+  domain socket bounded by OS filesystem/user permissions rather than the network (ADR-0011);
+  the webhook ingress authenticates untrusted and cross-host callers with a shared secret now,
+  pluggable for stronger mechanisms later; auth fails closed. Script plugins
   (ADR-0008) run in a defense-in-depth sandbox: host-mediated capabilities only, exec allowlist
   (argv, no shell), namespaced state, confined filesystem, per-invocation resource bounds; capability
   denials are logged without leaking payloads.
