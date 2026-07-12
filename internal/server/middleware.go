@@ -45,6 +45,31 @@ func requestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
 	}
 }
 
+// recoverer catches a panic from any downstream handler, logs it as a
+// structured error record (with the correlation ID), and returns a generic 500
+// — so a handler bug becomes a logged error and a clean response instead of a
+// dropped connection, and the server keeps serving. The response carries no
+// panic detail or stack, and the request body is never logged
+// (reference/security-fundamentals.md).
+func recoverer(logger *slog.Logger) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			defer func() {
+				if rec := recover(); rec != nil {
+					logger.ErrorContext(r.Context(), "server: recovered panic in handler",
+						slog.String("method", r.Method),
+						slog.String("path", r.URL.Path),
+						slog.String("correlation_id", CorrelationIDFrom(r.Context())),
+						slog.Any("panic", rec),
+					)
+					writeError(w, http.StatusInternalServerError, "internal error")
+				}
+			}()
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 // CorrelationIDFrom returns the correlation ID carried on ctx, or "" if absent.
 func CorrelationIDFrom(ctx context.Context) string {
 	if v, ok := ctx.Value(correlationIDKey).(string); ok {

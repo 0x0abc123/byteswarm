@@ -168,7 +168,7 @@ The last milestone. Structured logging already exists everywhere (see state
 note), so M5 fills the two gaps: a concrete adapter behind the `Emitter` port,
 and HTTP handler-panic recovery. Both are independent (parallelizable).
 
-- [ ] **F5.1 Business-event emitter adapter** · internal/telemetry · size M · depends on: — (F1.1's bus is unrelated — emission is outbound to sinks, not the bus)
+- [x] **F5.1 Business-event emitter adapter** · internal/telemetry · size M · depends on: — (F1.1's bus is unrelated — emission is outbound to sinks, not the bus)
   > /implement-feature slog-backed adapter for the telemetry.Emitter port.
   > - Component: internal/telemetry (adapter implementing the existing `Emitter` port: `Emit(ctx, name string, attrs map[string]any) error`).
   > - Behavior: a default emitter that routes a business event to a **sink**, with structured logging as the baseline sink (design-principles: logs first, OTel only on a future ADR). `NewEmitter(sink)` where the default sink is an `*slog.Logger`: `Emit` writes one structured record — the event `name`, the `attrs`, and the correlation ID from ctx (reuse the same correlation key the server sets) — at info level to a dedicated business-event logger. Keep the sink a small interface (or just `*slog.Logger`) so a real external/HTTP sink (consumer-defined, ADR-0006) can replace it later without changing callers. Do not log secrets — document that `attrs` are caller-controlled and must not carry credentials/PII (security-fundamentals). Validate a non-empty `name`.

@@ -25,7 +25,10 @@ func New(logger *slog.Logger, pub event.Publisher, webhookAuth auth.Authenticato
 	mux.HandleFunc("GET /readyz", writeStatus("ready"))
 	mux.HandleFunc("POST /events", submitEvent(logger, pub))
 	mux.HandleFunc("POST /webhook", webhook(logger, webhookAuth, pub))
-	return correlationID(requestLogger(logger)(mux))
+	// Order (outer→inner): correlationID sets the ID first, then requestLogger,
+	// then recoverer wraps the handlers — so a recovered panic is logged with
+	// the correlation ID already in context.
+	return correlationID(requestLogger(logger)(recoverer(logger)(mux)))
 }
 
 // writeStatus returns a handler emitting a small JSON status body.
