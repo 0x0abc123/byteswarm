@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func writeConfigFile(t *testing.T, body string) string {
@@ -88,6 +89,45 @@ func TestLoadConfigEnvOverridesFile(t *testing.T) {
 	}
 }
 
+func TestLoadConfigDefaultPluginTimeoutUnset(t *testing.T) {
+	cfg, err := loadConfig("") // no file
+	if err != nil {
+		t.Fatalf("loadConfig(\"\"): %v", err)
+	}
+	// Unset by default so the host keeps its built-in bound; override "if desired".
+	if _, set, err := cfg.pluginTimeout(); err != nil || set {
+		t.Errorf("pluginTimeout() = (set=%v, err=%v), want unset with no error", set, err)
+	}
+}
+
+func TestLoadConfigParsesPluginTimeout(t *testing.T) {
+	path := writeConfigFile(t, `{"pluginTimeout": "250ms"}`)
+	cfg, err := loadConfig(path)
+	if err != nil {
+		t.Fatalf("loadConfig: %v", err)
+	}
+	d, set, err := cfg.pluginTimeout()
+	if err != nil {
+		t.Fatalf("pluginTimeout(): %v", err)
+	}
+	if !set || d != 250*time.Millisecond {
+		t.Errorf("pluginTimeout() = (%v, set=%v), want 250ms set", d, set)
+	}
+}
+
+func TestLoadConfigEnvOverridesPluginTimeout(t *testing.T) {
+	path := writeConfigFile(t, `{"pluginTimeout": "1s"}`)
+	t.Setenv("BYTESWARM_PLUGIN_TIMEOUT", "3s")
+	cfg, err := loadConfig(path)
+	if err != nil {
+		t.Fatalf("loadConfig: %v", err)
+	}
+	d, set, err := cfg.pluginTimeout()
+	if err != nil || !set || d != 3*time.Second {
+		t.Errorf("pluginTimeout() = (%v, set=%v, err=%v), want env override 3s", d, set, err)
+	}
+}
+
 func TestLoadConfigFailsClosed(t *testing.T) {
 	tests := map[string]string{
 		"malformed json":               `{"httpAddr":`,
@@ -96,6 +136,9 @@ func TestLoadConfigFailsClosed(t *testing.T) {
 		"invalid socket mode":          `{"socket": {"mode": "99z"}}`,
 		"invalid plugin (no events)":   `{"plugins": [{"name": "x", "script": "1"}]}`,
 		"invalid plugin (two sources)": `{"plugins": [{"name": "x", "events": ["e"], "path": "p.js", "script": "1"}]}`,
+		"malformed plugin timeout":     `{"pluginTimeout": "5 minutes"}`,
+		"zero plugin timeout":          `{"pluginTimeout": "0s"}`,
+		"negative plugin timeout":      `{"pluginTimeout": "-1s"}`,
 	}
 	for name, body := range tests {
 		t.Run(name, func(t *testing.T) {
