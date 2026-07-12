@@ -5,9 +5,11 @@
 // immediately, then reports completion by publishing to the server's /events
 // socket (internal/eventclient).
 //
-// This is the walking skeleton (refactor-0005, PR 1): it builds, versions, and
-// parses the --foreground flag. The goja host API (job/publish/exec/fs/http/
-// log), daemonization, and the wall-clock watchdog land in the following PRs.
+// PR 2 (refactor-0005) adds the `run` subcommand: resolve a job by name and
+// execute it in the foreground with the full goja host API (job/publish/exec/
+// fs/http/log, internal/jobrunner). Daemonization (setsid/re-exec ahead of the
+// run so the launching plugin returns immediately) and the wall-clock watchdog
+// land in PR 3; --foreground will then select the non-detaching path.
 package main
 
 import (
@@ -45,7 +47,9 @@ func run(args []string, out io.Writer) error {
 	case "", "version":
 		fmt.Fprintf(out, "byteswarm-job %s\n", version)
 		return nil
+	case "run":
+		return runCmd(fs.Args()[1:], out)
 	default:
-		return fmt.Errorf("unknown command %q (job execution lands in refactor-0005 PR 2)", cmd)
+		return fmt.Errorf("unknown command %q", cmd)
 	}
 }
