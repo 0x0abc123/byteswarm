@@ -58,6 +58,7 @@ active:
   architecture_style: modular-monolith   # -> see adr_refs
   backend_language: go        # go | python | mixed
   clients: [cli, webhook]     # CLI primary; webhook ingress
+  release_trigger: git-tag    # v* tags publish versioned static binaries (adr 0012)
   data_stores: [postgresql, sqlite]      # behind a Repository port
   event_bus: nats-jetstream   # behind a Bus port (see adr 0004)
   ci_provider: github         # github | gitlab | jenkins
@@ -72,6 +73,7 @@ active:
     deploy_targets: "0006"
     ci_provider: "0007"
     plugin_model: "0008"
+    release_trigger: "0012"      # v* tag -> versioned static-binary GitHub Release
 
 # ---------------------------------------------------------------------------
 # Refactors IN FLIGHT only. When a refactor completes, its entry is REMOVED
