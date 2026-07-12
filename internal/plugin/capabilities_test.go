@@ -56,6 +56,25 @@ func TestSandboxedFSConfinement(t *testing.T) {
 	}
 }
 
+func TestSandboxedFSHome(t *testing.T) {
+	base := filepath.Join(t.TempDir(), "greet")
+	fs := NewSandboxedFS(base)
+
+	home := fs.Home()
+	if !filepath.IsAbs(home) {
+		t.Fatalf("Home() = %q, want an absolute path", home)
+	}
+	if filepath.Base(home) != "greet" {
+		t.Fatalf("Home() = %q, want it to end in the plugin dir %q", home, "greet")
+	}
+	// Security property: learning the home must not enable an escape — fs still
+	// rejects the absolute path (fail closed), so home cannot be fed back into
+	// read/write to reach outside the sandbox.
+	if _, err := fs.Resolve(home); !errors.Is(err, ErrPathEscape) {
+		t.Fatalf("Resolve(absolute home) error = %v, want ErrPathEscape", err)
+	}
+}
+
 // fakePublisher records published events.
 type fakePublisher struct{ got []event.Event }
 

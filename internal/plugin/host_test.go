@@ -79,6 +79,32 @@ func TestHandleRunsScriptEndToEnd(t *testing.T) {
 	}
 }
 
+func TestHandleExposesPluginHome(t *testing.T) {
+	repo := &fakeRepo{}
+	pub := &fakePublisher{}
+	h := testHost(repo, pub, t.TempDir())
+
+	// A script can learn its sandbox home and report it back.
+	sc, err := h.Load(PluginConfig{
+		Name:   "greet",
+		Events: []string{"x"},
+		Script: `host.publish("home_report", event.workflowID, {home: host.fs.home()});`,
+	})
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if err := sc.Handle(context.Background(), event.Event{Type: "x", WorkflowID: "wf1"}); err != nil {
+		t.Fatalf("Handle returned error: %v", err)
+	}
+	if len(pub.got) != 1 {
+		t.Fatalf("published %d events, want 1", len(pub.got))
+	}
+	// The reported home is the plugin's sandbox directory (<root>/greet).
+	if !strings.Contains(string(pub.got[0].Payload), "greet") {
+		t.Fatalf("home payload = %s, want it to contain the plugin dir %q", pub.got[0].Payload, "greet")
+	}
+}
+
 func TestHandleTimeoutInterruptsRunawayScript(t *testing.T) {
 	h := testHost(&fakeRepo{}, &fakePublisher{}, t.TempDir())
 	h.Timeout = 100 * time.Millisecond
