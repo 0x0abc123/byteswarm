@@ -13,7 +13,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -30,25 +29,19 @@ func main() {
 	}
 }
 
-// run is the testable entry point: it parses flags and dispatches. Job
-// execution is added in refactor-0005 PR 2.
+// run is the testable entry point: it dispatches the subcommand. Per-subcommand
+// flags (including run's --foreground) are parsed by the subcommand.
 func run(args []string, out io.Writer) error {
-	fs := flag.NewFlagSet("byteswarm-job", flag.ContinueOnError)
-	fs.SetOutput(out)
-	// foreground is parsed now so the flag contract is stable; the daemonize
-	// path that consumes it lands with job execution.
-	foreground := fs.Bool("foreground", false, "run in the foreground (do not daemonize) — for debugging")
-	if err := fs.Parse(args); err != nil {
-		return err
+	cmd := ""
+	if len(args) > 0 {
+		cmd = args[0]
 	}
-	_ = foreground
-
-	switch cmd := fs.Arg(0); cmd {
+	switch cmd {
 	case "", "version":
 		fmt.Fprintf(out, "byteswarm-job %s\n", version)
 		return nil
 	case "run":
-		return runCmd(fs.Args()[1:], out)
+		return runCmd(args[1:], out)
 	default:
 		return fmt.Errorf("unknown command %q", cmd)
 	}
