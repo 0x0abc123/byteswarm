@@ -131,7 +131,8 @@ func (h *Host) source(p PluginConfig) (string, error) {
 // program executed on a goja runtime (ADR-0008). It implements the same
 // consumer.Consumer port as native Go consumers, so the registry treats both
 // alike. The program runs with two globals in scope: `event` (the delivered
-// event) and `host` (the four capabilities).
+// event) and `host` (the four capabilities plus a read-only `plugin` metadata
+// object: its name and exec allowlist).
 type ScriptConsumer struct {
 	name    string
 	events  []string
@@ -255,6 +256,14 @@ func (c *ScriptConsumer) inject(ctx context.Context, rt *goja.Runtime, e event.E
 				pb = b
 			}
 			return c.caps.Publish.Publish(ctx, event.Event{Type: typ, WorkflowID: workflowID, Payload: pb})
+		},
+		// plugin: read-only metadata about this plugin's own identity and the
+		// exec commands it is permitted. `allowlist` is the logical command
+		// names only (not the host argv templates), so it discloses no host
+		// binary paths.
+		"plugin": map[string]interface{}{
+			"name":      c.name,
+			"allowlist": c.caps.Exec.AllowedCommands(),
 		},
 	}
 	_ = rt.Set("host", host)
