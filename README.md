@@ -96,6 +96,14 @@ PostgreSQL/SQLite store (ADR-0005).
 
 <!-- CUSTOM: additions below this line are preserved on regeneration -->
 
+## Writing plugins
+
+Authoring runtime JavaScript plugins? See the
+[plugin authoring guide](docs/plugin-authoring.md) for the full `host` API
+contract and — importantly — its security model and limitations (the `fs`
+sandbox does not constrain `exec` argument paths; untrusted plugins are not
+advised).
+
 ## Security: the two ingress trust models
 
 The server exposes two event ingress paths with **different trust boundaries**
