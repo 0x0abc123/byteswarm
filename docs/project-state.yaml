@@ -65,7 +65,7 @@ active:
   plugin_model: script-js+native-go   # goja JS script plugins coexist with compiled-in Go (adr 0008)
   adr_refs:                   # decision key -> ADR id (filename prefix)
     architecture_style: "0001"   # style stands; consumer-exec dimension amended by 0008
-    client_approach: "0002"
+    client_approach: "0011"      # 0002 superseded by 0011 (/events over Unix domain socket)
     backend_language: "0003"
     event_bus: "0004"            # event-type token rule superseded by 0010 (single dot-free token)
     data_stores: "0005"          # storage-representation superseded by 0009 (opaque bytes: BYTEA/BLOB)
@@ -77,7 +77,13 @@ active:
 # Refactors IN FLIGHT only. When a refactor completes, its entry is REMOVED
 # from this list and a completion event is written to docs/state-log/.
 # ---------------------------------------------------------------------------
-refactors: []                 # refactor-0001, -0002, -0003 completed (see docs/state-log/)
+refactors:                    # refactor-0001, -0002, -0003 completed (see docs/state-log/)
+  - id: refactor-0004
+    summary: "serve operator-local /events over a Unix domain socket (defence-in-depth)"
+    status: approved
+    approved_by: 0x0abc123
+    affected_stages: [c4design, bootstrap]
+    adr_refs: ["0011"]
   # refactor-0001, refactor-0002 completed (see docs/state-log/)
   # - id: refactor-0001
   #   summary: "split reporting into its own service"

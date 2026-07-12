@@ -1,0 +1,13 @@
+event: refactor-0004-approved
+timestamp: 2026-07-12T06:44:06Z
+actor: 0x0abc123
+stage: refactor-0004
+summary: Approved serving /events over a Unix domain socket (0660, operator group), UDS-only with cross-host publishers using the authenticated /webhook. New ADR-0011 supersedes 0002 (client_approach); ADR-0006 deploy targets stand (re-examine resolved — k8s/container use /webhook). Adapter-only change; domain ports untouched.
+refs:
+  adr: ["0011", "0002", "0006"]
+  commit: null
+  files:
+    - docs/adr/0011-events-unix-domain-socket.md
+    - docs/adr/0002-client-approach.md
+    - docs/architecture-brief.md
+    - docs/project-state.yaml

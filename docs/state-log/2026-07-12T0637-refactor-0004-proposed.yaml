@@ -1,0 +1,9 @@
+event: refactor-0004-proposed
+timestamp: 2026-07-12T06:37:41Z
+actor: 0x0abc123
+stage: refactor-0004
+summary: Proposed serving the operator-local /events ingress over a Unix domain socket (0660, operator group) for defence-in-depth, moving the trust boundary from the network to the OS filesystem/user model; reverses the "/events unauthenticated by design" decision in ADR-0002 (PR #35). HTTP contract unchanged; byteswarmctl dials the socket via a custom Transport.DialContext; TCP listener retained for /webhook. Entered impact analysis.
+refs:
+  adr: ["0002"]
+  commit: null
+  files: [docs/project-state.yaml]
