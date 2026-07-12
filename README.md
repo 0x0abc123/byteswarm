@@ -74,3 +74,23 @@ PostgreSQL/SQLite store (ADR-0005).
   lifecycle.
 
 <!-- CUSTOM: additions below this line are preserved on regeneration -->
+
+## Security: the `/events` ingress is unauthenticated by design
+
+The server exposes two event ingress paths, and they have **different trust
+models**:
+
+- **`POST /events`** — the operator-local ingress used by `byteswarmctl`. It
+  performs input validation and bounding but **no authentication**. This is a
+  deliberate trade-off (architecture brief: *"single trusted operator;
+  publish/consume unauthenticated"*): anyone who can reach this endpoint can
+  publish arbitrary events.
+- **`POST /webhook`** — the ingress for untrusted external triggers. It
+  **requires** the shared-secret authenticator (`BYTESWARM_WEBHOOK_SECRET`) and
+  fails closed when no secret is configured (ADR-0002).
+
+**Operational requirement:** `/events` must only be reachable from the trusted
+operator boundary (e.g. loopback, a private management network, or a
+reverse-proxy that enforces access control). Do **not** expose it to untrusted
+callers — its safety depends entirely on network-level access control, not on
+anything the application enforces. External event sources belong on `/webhook`.
