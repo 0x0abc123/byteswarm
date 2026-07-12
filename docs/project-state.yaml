@@ -59,6 +59,7 @@ active:
   backend_language: go        # go | python | mixed
   clients: [cli, webhook]     # CLI primary; webhook ingress
   release_trigger: git-tag    # v* tags publish versioned static binaries (adr 0012)
+  job_runner: byteswarm-job   # contained goja binary for long-running JS jobs (adr 0013)
   data_stores: [postgresql, sqlite]      # behind a Repository port
   event_bus: nats-jetstream   # behind a Bus port (see adr 0004)
   ci_provider: github         # github | gitlab | jenkins
@@ -74,12 +75,19 @@ active:
     ci_provider: "0007"
     plugin_model: "0008"
     release_trigger: "0012"      # v* tag -> versioned static-binary GitHub Release
+    job_runner: "0013"           # contained goja job-runner binary (byteswarm-job)
 
 # ---------------------------------------------------------------------------
 # Refactors IN FLIGHT only. When a refactor completes, its entry is REMOVED
 # from this list and a completion event is written to docs/state-log/.
 # ---------------------------------------------------------------------------
-refactors: []                 # refactor-0001..0004 completed (see docs/state-log/)
+refactors:                    # refactor-0001..0004 completed (see docs/state-log/)
+  - id: refactor-0005
+    summary: "contained goja JS job-runner binary (byteswarm-job) for long-running handlers"
+    status: approved
+    approved_by: 0x0abc123
+    affected_stages: [c4design, bootstrap]
+    adr_refs: ["0013"]         # new ADR; extends 0006/0008/0011/0012
   # refactor-0001, refactor-0002 completed (see docs/state-log/)
   # - id: refactor-0001
   #   summary: "split reporting into its own service"

@@ -7,13 +7,13 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/dop251/goja"
 
 	"github.com/0x0abc123/byteswarm/internal/consumer"
 	"github.com/0x0abc123/byteswarm/internal/event"
+	"github.com/0x0abc123/byteswarm/internal/pathguard"
 )
 
 // defaultInvocationTimeout bounds a single script invocation. goja cannot
@@ -117,7 +117,7 @@ func (h *Host) source(p PluginConfig) (string, error) {
 		return "", fmt.Errorf("plugin %q: script path must be relative to the plugins root", p.Name)
 	}
 	full := filepath.Join(h.root, p.Path)
-	if full != h.root && !strings.HasPrefix(full, h.root+string(filepath.Separator)) {
+	if !pathguard.Within(full, h.root) {
 		return "", fmt.Errorf("plugin %q: script path escapes the plugins root", p.Name)
 	}
 	b, err := os.ReadFile(full)

@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
+
+	"github.com/0x0abc123/byteswarm/internal/pathguard"
 )
 
 // ErrPathEscape is returned when a script-supplied path would resolve outside
@@ -52,12 +53,9 @@ func (f *SandboxedFS) Home() string {
 // and any ".." that climbs above base. Symlink-escape resolution is enforced
 // at open time by the real I/O attached with the goja runtime.
 func (f *SandboxedFS) Resolve(name string) (string, error) {
-	if filepath.IsAbs(name) {
-		return "", ErrPathEscape
-	}
-	full := filepath.Join(f.base, name) // Join cleans, collapsing ".."
-	if full != f.base && !strings.HasPrefix(full, f.base+string(filepath.Separator)) {
-		return "", ErrPathEscape
+	full, err := pathguard.Resolve(f.base, name)
+	if err != nil {
+		return "", ErrPathEscape // preserve the plugin's error identity for callers/logging
 	}
 	return full, nil
 }
@@ -69,11 +67,6 @@ func (f *SandboxedFS) realBase() (string, error) {
 		return "", err
 	}
 	return filepath.EvalSymlinks(f.base)
-}
-
-// within reports whether real is base or lies beneath it.
-func within(real, base string) bool {
-	return real == base || strings.HasPrefix(real, base+string(filepath.Separator))
 }
 
 // ReadFile reads a confined file. Beyond the lexical guard in Resolve, the
@@ -92,7 +85,7 @@ func (f *SandboxedFS) ReadFile(name string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !within(real, base) {
+	if !pathguard.Within(real, base) {
 		return nil, ErrPathEscape
 	}
 	info, err := os.Stat(real)
@@ -128,7 +121,7 @@ func (f *SandboxedFS) WriteFile(name string, data []byte) error {
 	if err != nil {
 		return err
 	}
-	if !within(realDir, base) {
+	if !pathguard.Within(realDir, base) {
 		return ErrPathEscape
 	}
 	if err := os.WriteFile(full, data, 0o600); err != nil {

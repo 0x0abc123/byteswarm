@@ -34,6 +34,9 @@ emit further events — composing larger workflows from small, independent steps
 - Extensible in-process consumer model; a consumer subscribes to one or a subset of event types.
 - Two consumer kinds behind one port: compiled-in Go consumers, and runtime-loaded JavaScript (goja)
   script plugins declared in config, sandboxed with a host capability API (ADR-0008).
+- Long-running work runs in a contained goja job-runner binary (`byteswarm-job`): operator-authored jobs,
+  triggered by name via the plugin `exec` allowlist, run detached outside the plugin sandbox with a broad
+  host API (ADR-0013).
 - Consumers run synchronous shell commands, launch long-running processes, read/write durable
   repositories, and call external services.
 - Consumers emit derived events destined for downstream consumers.
@@ -82,6 +85,9 @@ emit further events — composing larger workflows from small, independent steps
 - Consumer chain — a consumer handles an event, does its work, and emits derived event(s) downstream.
 - Plugin invocation — a script plugin subscribed to an event type is invoked with the event payload; it
   uses the host capability API (exec/store/fs/publish) within its sandbox and resource bounds (ADR-0008).
+- Long-running job — a plugin triggers the contained job-runner by name; it detaches, runs an
+  operator-authored JS job with a broad host API (exec/fs/http/publish/log), and reports completion by
+  publishing back to `/events` (ADR-0013).
 - Global broadcast — a systemwide notification is delivered to all subscribed consumers.
 - Replay / audit — past events for a `workflowID` are re-read from the durable log.
 - Reconnect & recovery — after reboot or network loss, an instance reconnects, resumes from durable

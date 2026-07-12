@@ -1,0 +1,12 @@
+event: refactor-0005-approved
+timestamp: 2026-07-12T14:53:00Z
+actor: 0x0abc123
+stage: refactor-0005
+summary: Approved refactor-0005 as analyzed. Adds contained goja job-runner binary byteswarm-job (ADR-0013, new decision_key job_runner). ADR-0008 stands (containment preserves the sandbox); ADR-0006/0011/0012 extended (third binary, /events socket-group principal, release includes the binary). Accepted trade-offs recorded in ADR-0013: untrusted job.args discipline and the widened /events boundary. Raw host.net sockets deferred to phase 2; phase 1 ships host.http only.
+refs:
+  adr: ["0013"]
+  commit: null
+  files:
+    - docs/adr/0013-contained-js-job-runner.md
+    - docs/project-state.yaml
+    - docs/architecture-brief.md
