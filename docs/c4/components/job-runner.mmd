@@ -1,0 +1,49 @@
+%% C4 L3 — Component diagram for byteswarm-job (contained goja job-runner)
+%% Source of truth: docs/adr/ (ADR-0013, refactor-0005) — regenerate via /generate-component-l3, do not hand-edit
+%% Generated: 2026-07-12
+%% Reflects the shipped code: cmd/byteswarm-job (root + daemonize) and
+%% internal/jobrunner (resolve, goja run + watchdog, host shims). host.net raw
+%% sockets are phase 2 and not yet a component.
+flowchart TB
+    srv["byteswarm Server<br/><i>[container: Go]</i>"]
+    tools["External tools & processes<br/><i>[external system]</i>"]
+    netsvc["External network services<br/><i>[external system]</i>"]
+    jobstore[("Job scripts, workdirs &amp; logs<br/><i>[files]</i>")]
+
+    subgraph job [byteswarm-job]
+        root["Composition root<br/><i>[component: cmd/byteswarm-job]</i>"]
+        daemon["Daemonizer — setsid/re-exec, stdio &rarr; job log<br/><i>[component]</i>"]
+        resolve["Resolve — job-name containment [via pathguard]<br/><i>[component]</i>"]
+        runtime["goja run + wall-clock watchdog<br/><i>[component: jobrunner.Run]</i>"]
+        pubShim["host.publish [via eventclient]<br/><i>[component]</i>"]
+        execShim["host.exec — unrestricted argv<br/><i>[component]</i>"]
+        fsShim["host.fs — open fs / per-job workdir<br/><i>[component]</i>"]
+        httpShim["host.http — HTTP(S) client<br/><i>[component]</i>"]
+        logShim["host.log — structured job log<br/><i>[component]</i>"]
+    end
+
+    srv -->|"launches by name, plugin exec allowlist [OS exec]"| root
+    root -->|"detaches (default)"| daemon
+    daemon -->|"re-execs worker, stdio &rarr; log [filesystem]"| jobstore
+    root -->|"resolves the job name"| resolve
+    resolve -->|"reads job script within jobs dir [filesystem]"| jobstore
+    root -->|"runs job under the deadline"| runtime
+    runtime -->|"exposes"| pubShim
+    runtime -->|"exposes"| execShim
+    runtime -->|"exposes"| fsShim
+    runtime -->|"exposes"| httpShim
+    runtime -->|"exposes"| logShim
+    pubShim -->|"publishes completion / job_failed [JSON over Unix socket]"| srv
+    execShim -->|"runs commands, bounded output [OS exec]"| tools
+    httpShim -->|"requests, bounded body [HTTP]"| netsvc
+    fsShim -->|"reads/writes [filesystem]"| jobstore
+    logShim -->|"appends [filesystem]"| jobstore
+
+    classDef person    fill:#08427b,stroke:#052e56,color:#ffffff
+    classDef internal  fill:#1168bd,stroke:#0b4884,color:#ffffff
+    classDef external  fill:#999999,stroke:#6b6b6b,color:#ffffff
+    classDef datastore fill:#438dd5,stroke:#2e6295,color:#ffffff
+    classDef component fill:#85bbf0,stroke:#5d82a8,color:#000000
+    class srv,tools,netsvc external
+    class jobstore datastore
+    class root,daemon,resolve,runtime,pubShim,execShim,fsShim,httpShim,logShim component

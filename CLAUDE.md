@@ -3,16 +3,11 @@
 
 # byteswarm
 
-An event-driven automation framework whose consumers run in-process behind one
-Consumer port: compiled-in Go plugins and runtime-loaded JavaScript scripts (goja,
-ADR-0008). Architecture: modular monolith, single Go 1.22 module, ports-and-adapters
-(ADR-0001, ADR-0003). Context: docs/adr/, docs/c4/, README.md.
+An event-driven automation framework whose consumers run in-process behind one Consumer port: compiled-in Go plugins and runtime-loaded JavaScript scripts (goja, ADR-0008); a contained goja job-runner (byteswarm-job, ADR-0013) offloads long-running work. Architecture: modular monolith, single Go 1.22 module, ports-and-adapters (ADR-0001, ADR-0003). Context: docs/adr/, docs/c4/, README.md.
 
 ## Workflow
 
-All implementation work goes through the `/implement-feature` skill (branching,
-tests, verification, PR). Architecture changes go through
-`/refactor-architecture`. Check `docs/project-state.yaml` before pipeline work.
+All implementation work goes through the `/implement-feature` skill (branching, tests, verification, PR). Architecture changes go through `/refactor-architecture`. Check `docs/project-state.yaml` before pipeline work.
 
 ## Skills
 
@@ -28,8 +23,9 @@ tests, verification, PR). Architecture changes go through
 - Branches: `<type>/<short-description>`. Commits: Conventional Commits.
 - Dispatch the `verifier` subagent for test/lint runs — never run and parse raw test output in the main context.
 - Follow reference/design-principles.md and reference/security-fundamentals.md.
-- Ports-and-adapters is mandatory: domain packages define the ports they consume; adapters (internal/server, internal/plugin, and store as it lands) implement them; wiring lives only in cmd/*/main.go. Go style & patterns: reference/stacks/go.md.
+- Ports-and-adapters is mandatory: domain packages define the ports they consume; adapters (internal/server, internal/plugin, internal/store) implement them; wiring lives only in cmd/*/main.go. Go style & patterns: reference/stacks/go.md.
 - Script plugins are sandboxed (ADR-0008): the `exec` allowlist is argv-only and fails closed; event payloads and script-supplied paths/keys/argv are untrusted and validated at the host boundary; capability denials are logged and security-reviewed per reference/security-fundamentals.md.
+- byteswarm-job runs OUTSIDE the plugin sandbox (ADR-0013): plugins trigger it by job name only under fail-closed name-not-path containment (internal/pathguard); operator-authored jobs must treat `job.args` as hostile — never forward untrusted data into `exec`/`http`.
 - Architecture and diagrams are generated from ADRs — never hand-edit docs/c4/*.mmd or this file.
 - `reference/<path>` resolves project-first, then falls back to `.claude/skills/reference/<path>` (framework defaults).
 
@@ -39,10 +35,14 @@ tests, verification, PR). Architecture changes go through
 |---|---|---|
 | cmd/byteswarm/ | Server binary — composition root (Server container) | docs/c4/l2-container.mmd |
 | cmd/byteswarmctl/ | CLI — primary operator client (CLI container) | ADR-0011 |
+| cmd/byteswarm-job/ | Job-runner binary — contained goja runtime for operator-authored long-running jobs (byteswarm-job container) | ADR-0013 |
 | internal/event/ | Core event model & routing ports (domain) | ADR-0001, ADR-0004 |
 | internal/consumer/ | Consumer port (native + script) & Repository port (domain) | ADR-0001, ADR-0005, ADR-0009, ADR-0008 |
 | internal/store/ | Repository-port adapters — PostgreSQL (BYTEA) + SQLite (BLOB); consumer state is opaque bytes | ADR-0005, ADR-0009 |
 | internal/plugin/ | Script-plugin host adapter — goja JS runtime + sandboxed capability API (exec/store/fs/publish) | ADR-0008 |
+| internal/jobrunner/ | Job-runner host adapter — goja runtime + broad-but-bounded capability API (job/publish/exec/fs/http/log) outside the plugin sandbox | ADR-0013 |
+| internal/eventclient/ | Shared /events Unix-socket publish client (reused by byteswarmctl + byteswarm-job) | ADR-0011, ADR-0013 |
+| internal/pathguard/ | Shared lexical containment guard — rejects absolute paths & `..` (reused by internal/plugin) | ADR-0008, ADR-0013 |
 | internal/workflow/ | Workflow lifecycle: subscription, reconnect, redelivery | ADR-0001, ADR-0004 |
 | internal/bus/ | Event-bus adapter — NATS JetStream publish + durable subscription (event.Bus port) | ADR-0004 |
 | internal/auth/ | Authentication port (default shared-secret) | ADR-0011 |
@@ -53,9 +53,6 @@ External runtime (no infra code in-repo; adapters live in internal/bus & interna
 
 ## Common commands
 
-Single Go module — run at the repo root: `go build ./...` · `go test -race -cover ./...`
-· `go vet ./...` + `test -z "$(gofmt -l .)"` · `go run ./cmd/byteswarm` (server) /
-`./cmd/byteswarmctl` (CLI). Full command table (setup, format, vuln scan) & style:
-reference/stacks/go.md.
+Single Go module — run at the repo root: `go build ./...` · `go test -race -cover ./...` · `go vet ./...` + `test -z "$(gofmt -l .)"` · run binaries with `go run ./cmd/{byteswarm|byteswarmctl|byteswarm-job}`. Full command table (setup, format, vuln scan) & style: reference/stacks/go.md.
 
 <!-- CUSTOM: additions below this line are preserved on regeneration -->
