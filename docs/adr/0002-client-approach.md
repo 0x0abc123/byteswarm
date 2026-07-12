@@ -27,7 +27,9 @@ We will provide a **CLI tool as the primary client** (stdlib flag-based command
 parsing, shipped as a static binary) and expose an **HTTP webhook ingress** on
 the server. Both are thin **ingress adapters** that produce events into the core
 through an ingress port; there is no web UI. The webhook authenticates via a
-**pluggable auth port** (shared-secret adapter by default).
+**pluggable auth port** (shared-secret adapter by default). The CLI-facing event
+ingress (`POST /events`) is **operator-local and unauthenticated by design**;
+only the webhook ingress is authenticated.
 
 ## Consequences
 
@@ -38,6 +40,13 @@ through an ingress port; there is no web UI. The webhook authenticates via a
 - Webhook auth is configurable: the shared-secret adapter today, stronger
   mechanisms (SSO/JWT/mTLS) later, without touching the core; the auth path
   fails closed.
+- The operator-local `/events` ingress validates and bounds input but performs
+  no authentication (architecture brief: single trusted operator; publish/consume
+  unauthenticated). Its safety therefore depends on the deployment keeping it
+  within the trusted operator boundary — loopback, a private management network,
+  or an access-controlling reverse proxy; it must not be exposed to untrusted
+  callers. Untrusted external event sources use the authenticated `/webhook`
+  ingress instead.
 - The exact transport by which the CLI produces events (server HTTP ingress vs.
   direct bus publish) is left to component design (c4-designer).
 - If an interactive multi-user UI is ever needed, a vanilla Svelte SPA can be
