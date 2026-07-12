@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"sync/atomic"
 	"testing"
+
+	"github.com/0x0abc123/byteswarm/internal/eventclient"
 )
 
 // startSocketServer serves h on a Unix domain socket in a temp dir and returns
@@ -29,11 +31,11 @@ func startSocketServer(t *testing.T, h http.Handler) string {
 func TestPublishSendsRequest(t *testing.T) {
 	type captured struct {
 		method, path string
-		body         publishBody
+		body         eventclient.Event
 	}
 	got := make(chan captured, 1)
 	sock := startSocketServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var b publishBody
+		var b eventclient.Event
 		_ = json.NewDecoder(r.Body).Decode(&b)
 		got <- captured{r.Method, r.URL.Path, b}
 		w.WriteHeader(http.StatusAccepted)
