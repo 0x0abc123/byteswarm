@@ -1,0 +1,33 @@
+%% C4 dynamic — Long-running job invocation (contained goja job-runner)
+%% Source of truth: docs/adr/ (ADR-0013) + docs/architecture-brief.md — regenerate via /c4-designer, do not hand-edit
+%% Generated: 2026-07-12
+sequenceDiagram
+    autonumber
+    participant SRV as byteswarm Server (plugin)
+    participant JOB as byteswarm-job
+    participant JOBSTORE as Job workdirs & logs
+    participant TOOLS as External tools & processes
+    participant NET as External network services
+
+    SRV->>SRV: script plugin handles event, decides to run a long job
+    SRV->>JOB: host.exec allowlisted runner: run --jobs-dir D <name> <args> [OS exec]
+    Note over JOB: name resolved WITHIN jobs dir (pathguard: no abs, no ".."); args are UNTRUSTED
+    JOB->>JOB: daemonize — setsid/re-exec, stdio to job log
+    JOB-->>SRV: launcher exits 0 (host.exec returns within the plugin timeout)
+    Note over SRV,JOB: triggering event is acked now — at-least-once no longer covers the detached work
+    JOB->>JOBSTORE: create per-job workdir + open job log [filesystem]
+    JOB->>JOB: run operator-authored JS on goja under a wall-clock watchdog
+    opt host.exec(bin, argv, opts)
+        JOB->>TOOLS: run command, unrestricted argv, bounded output [OS exec]
+        TOOLS-->>JOB: stdout / stderr / exit code
+    end
+    opt host.fs / host.http
+        JOB->>JOBSTORE: open file I/O (absolute or per-job workdir) [filesystem]
+        JOB->>NET: HTTP(S) request, bounded body [network]
+    end
+    alt completes within wall-clock
+        JOB->>SRV: host.publish completion, operator-local (0660 socket) [JSON over Unix domain socket]
+    else timeout / uncaught error
+        JOB->>JOB: watchdog interrupts VM; log bounded failure to job log
+        JOB->>SRV: publish job_failed safety-net event [JSON over Unix domain socket]
+    end

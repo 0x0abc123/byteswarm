@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/0x0abc123/byteswarm/internal/eventclient"
 )
@@ -154,6 +155,24 @@ func TestLogWritesStructured(t *testing.T) {
 	out := logbuf.String()
 	if !strings.Contains(out, "heads up") || !strings.Contains(out, `"job":"logger"`) {
 		t.Errorf("log output missing message/context: %s", out)
+	}
+}
+
+func TestRunWallClockInterrupt(t *testing.T) {
+	d, _ := testDeps(t, &fakePub{})
+	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() { done <- d.Run(ctx, Job{Name: "loop"}, `while (true) {}`) }()
+
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("a runaway job should be interrupted by the wall-clock and return an error")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("watchdog did not interrupt the runaway job")
 	}
 }
 

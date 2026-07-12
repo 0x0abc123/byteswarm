@@ -133,6 +133,20 @@ func (d Deps) Run(ctx context.Context, job Job, src string) error {
 	}
 	rt := goja.New()
 	(&binding{ctx: ctx, deps: d, job: job, workdir: workdir}).inject(rt)
+
+	// Wall-clock watchdog: interrupt the VM when ctx is cancelled or its
+	// deadline passes, so a runaway job (tight loop, wedged native call) is
+	// actually stopped. goja cannot preempt otherwise (cf. the plugin host).
+	stop := make(chan struct{})
+	go func() {
+		select {
+		case <-ctx.Done():
+			rt.Interrupt(ctx.Err())
+		case <-stop:
+		}
+	}()
+	defer close(stop)
+
 	if _, err := rt.RunProgram(prog); err != nil {
 		return fmt.Errorf("job %q: %w", job.Name, err)
 	}

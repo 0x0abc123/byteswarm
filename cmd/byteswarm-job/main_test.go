@@ -32,10 +32,3 @@ func TestRunUnknownCommandErrors(t *testing.T) {
 		t.Fatal("run(unknown) should return an error")
 	}
 }
-
-func TestRunForegroundFlagParses(t *testing.T) {
-	var out bytes.Buffer
-	if err := run([]string{"--foreground", "version"}, &out); err != nil {
-		t.Fatalf("run(--foreground version): %v", err)
-	}
-}

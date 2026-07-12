@@ -19,6 +19,7 @@ func TestRunCmdExecutesJob(t *testing.T) {
 
 	var out bytes.Buffer
 	err := runCmd([]string{
+		"--foreground", // run inline rather than daemonizing
 		"--jobs-dir", jobsDir,
 		"--job-id", "j1",
 		"--workdir-base", workdir,
@@ -34,9 +35,10 @@ func TestRunCmdExecutesJob(t *testing.T) {
 
 func TestRunCmdRequiresFlags(t *testing.T) {
 	cases := [][]string{
-		{"--job-id", "j1", "hello.js"},                // missing --jobs-dir
-		{"--jobs-dir", t.TempDir(), "hello.js"},       // missing --job-id
-		{"--jobs-dir", t.TempDir(), "--job-id", "j1"}, // missing job name
+		{"--job-id", "j1", "hello.js"},                            // missing --jobs-dir
+		{"--jobs-dir", t.TempDir(), "hello.js"},                   // missing --job-id
+		{"--jobs-dir", t.TempDir(), "--job-id", "j1"},             // missing job name
+		{"--jobs-dir", t.TempDir(), "--job-id", "j1", "hello.js"}, // not --foreground, no --log-dir
 	}
 	for _, args := range cases {
 		var out bytes.Buffer

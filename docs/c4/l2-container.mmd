@@ -12,6 +12,8 @@ flowchart TB
         bus["Event Bus<br/><i>[container: NATS JetStream]</i>"]
         db[("State Store<br/><i>[db: PostgreSQL default / SQLite embedded]</i>")]
         plugins[("Plugin store<br/><i>[files: config + JS scripts + per-plugin sandbox dirs]</i>")]
+        job["byteswarm-job<br/><i>[container: Go static binary — contained goja job-runner]</i>"]
+        jobstore[("Job workdirs & logs<br/><i>[files]</i>")]
     end
 
     tools["External tools & processes<br/><i>[external system]</i>"]
@@ -32,12 +34,18 @@ flowchart TB
     srv -->|"emits business events [consumer-defined]"| sinks
     srv -->|"ships errors/exceptions [structured logs]"| logsink
 
+    srv -->|"launches operator-authored job by name, plugin exec allowlist [OS exec]"| job
+    job -->|"publishes completion/progress, operator-local (0660 socket) [JSON over Unix domain socket]"| srv
+    job -->|"runs commands, unrestricted argv [OS exec]"| tools
+    job -->|"reads from / sends data to [HTTP; raw sockets phase 2]"| netsvc
+    job -->|"per-job workdir + job log [filesystem]"| jobstore
+
     classDef person    fill:#08427b,stroke:#052e56,color:#ffffff
     classDef internal  fill:#1168bd,stroke:#0b4884,color:#ffffff
     classDef external  fill:#999999,stroke:#6b6b6b,color:#ffffff
     classDef datastore fill:#438dd5,stroke:#2e6295,color:#ffffff
     classDef component fill:#85bbf0,stroke:#5d82a8,color:#000000
     class operator,pauthor person
-    class cli,srv,bus internal
-    class db,plugins datastore
+    class cli,srv,bus,job internal
+    class db,plugins,jobstore datastore
     class trigger,tools,netsvc,sinks,logsink external
