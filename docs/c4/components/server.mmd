@@ -6,6 +6,7 @@
 %% on branch refactor/0004-events-uds.
 flowchart TB
     cli["CLI<br/><i>[container: Go static binary]</i>"]
+    job["byteswarm-job<br/><i>[container: goja job-runner]</i>"]
     trigger["External trigger source<br/><i>[external system]</i>"]
     bus["Event Bus<br/><i>[container: NATS JetStream]</i>"]
 
@@ -24,6 +25,7 @@ flowchart TB
     end
 
     cli -->|"submits events, operator-local (0660) [JSON over Unix socket]"| udsL
+    job -->|"publishes job completion, operator-local (0660) [JSON over Unix socket]"| udsL
     trigger -->|"fires events (shared-secret auth) [JSON/HTTPS/TCP]"| tcpL
     root -->|"binds, owns socket lifecycle (unlink/cleanup)"| udsL
     root -->|"binds"| tcpL
@@ -44,5 +46,5 @@ flowchart TB
     classDef external  fill:#999999,stroke:#6b6b6b,color:#ffffff
     classDef datastore fill:#438dd5,stroke:#2e6295,color:#ffffff
     classDef component fill:#85bbf0,stroke:#5d82a8,color:#000000
-    class cli,trigger,bus external
+    class cli,job,trigger,bus external
     class root,udsL,tcpL,mw,evH,whH,hH,accept,authPort,secret,pubPort component
