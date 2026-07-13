@@ -104,6 +104,38 @@ contract and — importantly — its security model and limitations (the `fs`
 sandbox does not constrain `exec` argument paths; untrusted plugins are not
 advised).
 
+## Long-running jobs (`byteswarm-job`)
+
+Plugin handlers must finish within the per-invocation timeout. For work that
+can't — reports, backups, media processing — byteswarm ships a third binary,
+**`byteswarm-job`**: a contained [goja](https://github.com/dop251/goja) runner
+for **operator-authored** JavaScript jobs (ADR-0013). No Node.js, no bash
+wrapper.
+
+- **Triggered by name, not path.** A plugin launches a job through the plugin
+  `exec` allowlist; the allowlist template pins the runner and its jobs
+  directory, and the plugin passes only a job *name*, which the runner resolves
+  **within** that directory (absolute paths and `..` rejected). A plugin can
+  only trigger scripts the operator placed there.
+- **Detaches automatically.** The runner re-execs itself into a new session and
+  returns immediately, so the launching plugin's `host.exec` returns within the
+  invocation timeout while the job runs on. A `--max-wall-clock` bound kills a
+  runaway job; on crash or timeout it publishes a `job_failed` event and writes
+  a per-job log.
+- **Broad, bounded host API.** Jobs get `host.publish` (to `/events`, no NATS
+  credentials), `host.exec` (unrestricted argv), `host.fs` (open), `host.http`,
+  and `host.log` — deliberately **outside** the plugin sandbox. Raw TCP/UDP
+  sockets are a planned phase 2. There is no `host.store` (jobs report state via
+  events/files).
+- **Deployment.** Because the job's authority is broad, run `byteswarm-job` as a
+  **constrained OS user that is a member of the `/events` socket group** — so
+  `host.publish` works while `exec`/`fs` power is contained at the OS level
+  (cgroups/systemd). Its `job.args` come from a plugin and are **untrusted**;
+  operator jobs must validate them.
+
+The [plugin authoring guide](docs/plugin-authoring.md#long-running-work) has a
+worked example (trigger plugin + job script).
+
 ## Security: the two ingress trust models
 
 The server exposes two event ingress paths with **different trust boundaries**

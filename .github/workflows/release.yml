@@ -1,7 +1,7 @@
 # Release workflow — hand-authored, NOT skill-generated (generate-cicd owns only
 # verify/package/deploy, so it will not clobber this file). On a v* tag it builds
-# static byteswarm + byteswarmctl binaries for the supported platforms, archives
-# and checksums them, and publishes a GitHub Release.
+# static byteswarm + byteswarmctl + byteswarm-job binaries for the supported
+# platforms, archives and checksums them, and publishes a GitHub Release.
 #
 # ADR-0006: the artifact is static Go binaries. CGO_ENABLED=0 is valid because
 # both DB drivers are pure Go (modernc.org/sqlite, jackc/pgx), so the build
@@ -9,8 +9,8 @@
 # SHAs (reference/security-fundamentals.md: pin dependency versions).
 #
 # Targets are Unix-only: the server binds the operator-local /events Unix domain
-# socket (ADR-0011, syscall.Umask) and does not build for Windows, so the product
-# is not shipped there.
+# socket (ADR-0011, syscall.Umask) and byteswarm-job daemonizes via setsid
+# (ADR-0013); neither builds for Windows, so the product is not shipped there.
 name: release
 
 on:
@@ -49,7 +49,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p build
-          for cmd in byteswarm byteswarmctl; do
+          for cmd in byteswarm byteswarmctl byteswarm-job; do
             # -trimpath for reproducibility; -s -w strip debug info; -X stamps the
             # tag into main.version of each binary.
             go build -trimpath \
