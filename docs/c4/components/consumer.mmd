@@ -6,6 +6,7 @@
 flowchart TB
     bus["Event Bus<br/><i>[external system: NATS JetStream]</i>"]
     tools["External tools & processes<br/><i>[external system]</i>"]
+    jobr["byteswarm-job<br/><i>[container: goja job-runner]</i>"]
     db[("State Store<br/><i>[db: PostgreSQL / SQLite]</i>")]
     pstore[("Plugin store<br/><i>[files: config + JS scripts + sandbox dirs]</i>")]
 
@@ -26,6 +27,7 @@ flowchart TB
     gocon -->|"persists state [via Repository]"| repo
     gocon -->|"publishes derived event [via event.Bus]"| evt
     host -->|"runs allowlisted command (argv, no shell) [exec capability]"| tools
+    host -->|"launches long-running job by name (exec allowlist) [OS exec]"| jobr
     host -->|"read/write namespaced state [via Repository]"| repo
     host -->|"read/write confined files [fs capability]"| pstore
     host -->|"publishes derived event [via event.Bus]"| evt
@@ -38,5 +40,5 @@ flowchart TB
     classDef datastore fill:#438dd5,stroke:#2e6295,color:#ffffff
     classDef component fill:#85bbf0,stroke:#5d82a8,color:#000000
     class reg,evt,repo,gocon,host,loader component
-    class bus,tools external
+    class bus,tools,jobr external
     class db,pstore datastore
