@@ -81,13 +81,7 @@ active:
 # Refactors IN FLIGHT only. When a refactor completes, its entry is REMOVED
 # from this list and a completion event is written to docs/state-log/.
 # ---------------------------------------------------------------------------
-refactors:                    # refactor-0001..0004 completed (see docs/state-log/)
-  - id: refactor-0005
-    summary: "contained goja JS job-runner binary (byteswarm-job) for long-running handlers"
-    status: approved
-    approved_by: 0x0abc123
-    affected_stages: [c4design, bootstrap]
-    adr_refs: ["0013"]         # new ADR; extends 0006/0008/0011/0012
+refactors: []                 # refactor-0001..0005 completed (see docs/state-log/)
   # refactor-0001, refactor-0002 completed (see docs/state-log/)
   # - id: refactor-0001
   #   summary: "split reporting into its own service"
