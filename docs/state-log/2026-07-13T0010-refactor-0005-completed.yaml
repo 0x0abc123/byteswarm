@@ -1,0 +1,16 @@
+event: refactor-0005-completed
+timestamp: 2026-07-13T00:10:00Z
+actor: 0x0abc123
+stage: refactor-0005
+summary: Completed refactor-0005 — the contained goja job-runner binary byteswarm-job (ADR-0013). Shipped across four PRs — #45 foundation (pathguard + eventclient + skeleton), #46 host API + foreground execution, #47 daemonize + wall-clock watchdog + C4/CLAUDE, #48 release + docs (bash daemon example replaced with a byteswarm-job JS job). ADR-0008 stands; ADR-0006/0011/0012 extended. Raw host.net sockets deferred to phase 2. In-flight refactor entry removed.
+refs:
+  adr: ["0013"]
+  commit: null
+  files:
+    - docs/adr/0013-contained-js-job-runner.md
+    - cmd/byteswarm-job/
+    - internal/jobrunner/
+    - internal/eventclient/
+    - internal/pathguard/
+    - docs/c4/components/job-runner.mmd
+    - docs/c4/sequences/job-invocation.mmd
